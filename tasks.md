@@ -147,7 +147,7 @@
 - [x] Integrate GitHub backend into CLI commands via `backend_helper.go`
 
 ### Configuration
-- [ ] Implement `backlog config init` — interactive setup
+- [x] Implement `backlog config init` — interactive setup
 - [x] Support `GITHUB_TOKEN` environment variable
 - [ ] Support credentials.yaml for token storage
 
