@@ -371,10 +371,10 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: Output format consistent across backends
 
 ### Feature: Agent Workflow Integration (`agent_workflow.feature`)
-- [ ] Scenario: Full agent workflow — next, claim, work, complete
-- [ ] Scenario: Agent picks different task when claim fails
-- [ ] Scenario: Agent releases task on failure
-- [ ] Scenario: Multi-agent partitioning by labels
+- [x] Scenario: Full agent workflow — next, claim, work, complete
+- [x] Scenario: Agent picks different task when claim fails
+- [x] Scenario: Agent releases task on failure
+- [x] Scenario: Multi-agent partitioning by labels
 
 ---
 
@@ -410,4 +410,4 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 | Phase 4: GitHub Issues | Complete | 6 | 73 |
 | Phase 5: GitHub Projects | Complete | 1 | 7 |
 | Phase 6: Linear | Complete | 4 | 50 |
-| Cross-Cutting | In Progress | 1 | 3 |
+| Cross-Cutting | Complete | 2 | 7 |
