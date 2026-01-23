@@ -64,3 +64,20 @@ Feature: Listing Tasks
     And the JSON output should have "tasks[0].assignee" equal to "alice"
     And the JSON output should have array "tasks[0].labels" containing "feature"
     And the JSON output should have array "tasks[0].labels" containing "api"
+
+  Scenario: List tasks in plain format
+    Given a backlog with the following tasks:
+      | id    | title           | status      | priority |
+      | task1 | First task      | todo        | high     |
+      | task2 | Second task     | in-progress | medium   |
+      | task3 | Third task      | backlog     | low      |
+    When I run "backlog list -f plain"
+    Then the exit code should be 0
+    And stdout should contain "task1"
+    And stdout should contain "First task"
+    And stdout should contain "task2"
+    And stdout should contain "Second task"
+    And stdout should contain "task3"
+    And stdout should contain "Third task"
+    And stdout should not contain "ID"
+    And stdout should not contain "STATUS"

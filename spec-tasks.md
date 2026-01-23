@@ -63,7 +63,7 @@ This plan covers implementing a Gherkin-based executable specification using [go
 - [x] Scenario: List all tasks (excludes done by default)
 - [x] Scenario: List tasks in table format (default)
 - [x] Scenario: List tasks in JSON format
-- [ ] Scenario: List tasks in plain format
+- [x] Scenario: List tasks in plain format
 - [ ] Scenario: List tasks in id-only format
 - [ ] Scenario: List with status filter
 - [ ] Scenario: List with multiple status values
@@ -376,7 +376,7 @@ This plan covers implementing a Gherkin-based executable specification using [go
 | Phase | Status | Feature Files | Scenarios |
 |-------|--------|---------------|-----------|
 | Phase 0: Infrastructure | Complete | 0 | 0 |
-| Phase 1: Local CRUD | In Progress | 3 | 16 |
+| Phase 1: Local CRUD | In Progress | 3 | 17 |
 | Phase 1b: Output Formats | Not Started | 0 | 0 |
 | Phase 1c: Configuration | Not Started | 0 | 0 |
 | Phase 1d: Error Handling | Not Started | 0 | 0 |
