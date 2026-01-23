@@ -212,7 +212,7 @@
 - [x] Set up cross-compilation (darwin/arm64, linux/amd64, windows/amd64)
 - [x] Create GitHub Actions workflow for releases
 - [x] Set up Homebrew tap
-- [ ] Publish to `go install`
+- [x] Publish to `go install`
 
 ---
 
