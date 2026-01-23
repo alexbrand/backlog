@@ -17,7 +17,7 @@ This plan covers implementing a Gherkin-based executable specification using [go
 - [x] Create `spec/main_test.go` — godog test runner entry point
 
 ### Test Harness
-- [ ] Implement temp directory setup/teardown for isolated test runs
+- [x] Implement temp directory setup/teardown for isolated test runs
 - [ ] Implement CLI runner helper (executes `backlog` commands, captures stdout/stderr/exit code)
 - [ ] Implement fixture loader for pre-built `.backlog/` directories
 - [ ] Implement JSON output parser for structured assertions
@@ -373,7 +373,7 @@ This plan covers implementing a Gherkin-based executable specification using [go
 
 | Phase | Status | Feature Files | Scenarios |
 |-------|--------|---------------|-----------|
-| Phase 0: Infrastructure | Not Started | 0 | 0 |
+| Phase 0: Infrastructure | In Progress | 0 | 0 |
 | Phase 1: Local CRUD | Not Started | 0 | 0 |
 | Phase 1b: Output Formats | Not Started | 0 | 0 |
 | Phase 1c: Configuration | Not Started | 0 | 0 |
