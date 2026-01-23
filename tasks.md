@@ -204,9 +204,9 @@
 - [x] Test multi-agent claim scenarios
 
 ### Documentation
-- [ ] Write README.md with installation and usage
-- [ ] Document configuration options
-- [ ] Add examples for agent integration patterns
+- [x] Write README.md with installation and usage
+- [x] Document configuration options
+- [x] Add examples for agent integration patterns
 
 ### Build & Distribution
 - [ ] Set up cross-compilation (darwin/arm64, linux/amd64, windows/amd64)
