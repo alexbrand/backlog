@@ -89,6 +89,7 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	// Then steps
 	ctx.Step(`^the exit code should be (\d+)$`, theExitCodeShouldBe)
 	ctx.Step(`^stdout should contain "([^"]*)"$`, stdoutShouldContain)
+	ctx.Step(`^stdout should not contain "([^"]*)"$`, stdoutShouldNotContain)
 	ctx.Step(`^stderr should contain "([^"]*)"$`, stderrShouldContain)
 	ctx.Step(`^stdout should be empty$`, stdoutShouldBeEmpty)
 	ctx.Step(`^stderr should be empty$`, stderrShouldBeEmpty)
@@ -235,6 +236,20 @@ func stdoutShouldContain(ctx context.Context, expected string) error {
 
 	if !strings.Contains(result.Stdout, expected) {
 		return fmt.Errorf("expected stdout to contain %q, got:\n%s", expected, result.Stdout)
+	}
+
+	return nil
+}
+
+// stdoutShouldNotContain verifies stdout does not contain a substring.
+func stdoutShouldNotContain(ctx context.Context, unexpected string) error {
+	result := getLastResult(ctx)
+	if result == nil {
+		return fmt.Errorf("no command has been run")
+	}
+
+	if strings.Contains(result.Stdout, unexpected) {
+		return fmt.Errorf("expected stdout to not contain %q, but it does:\n%s", unexpected, result.Stdout)
 	}
 
 	return nil

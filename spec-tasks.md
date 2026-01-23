@@ -60,7 +60,7 @@ This plan covers implementing a Gherkin-based executable specification using [go
 - [x] Scenario Outline: Add task with each priority level
 
 ### Feature: Listing Tasks (`list.feature`)
-- [ ] Scenario: List all tasks (excludes done by default)
+- [x] Scenario: List all tasks (excludes done by default)
 - [ ] Scenario: List tasks in table format (default)
 - [ ] Scenario: List tasks in JSON format
 - [ ] Scenario: List tasks in plain format
@@ -376,7 +376,7 @@ This plan covers implementing a Gherkin-based executable specification using [go
 | Phase | Status | Feature Files | Scenarios |
 |-------|--------|---------------|-----------|
 | Phase 0: Infrastructure | Complete | 0 | 0 |
-| Phase 1: Local CRUD | In Progress | 2 | 15 |
+| Phase 1: Local CRUD | In Progress | 3 | 16 |
 | Phase 1b: Output Formats | Not Started | 0 | 0 |
 | Phase 1c: Configuration | Not Started | 0 | 0 |
 | Phase 1d: Error Handling | Not Started | 0 | 0 |
