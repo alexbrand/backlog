@@ -67,13 +67,19 @@ func configDir() (string, error) {
 }
 
 // Init initializes the configuration system.
-// If cfgPath is empty, it uses the default config location.
+// Config files are searched in the following order:
+// 1. Explicit path via cfgPath parameter (--config flag)
+// 2. Project-local: .backlog/config.yaml (current directory)
+// 3. User global: ~/.config/backlog/config.yaml
 func Init(cfgPath string) error {
 	cfgFile = cfgPath
 
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
+		// Check for project-local config first
+		viper.AddConfigPath(".backlog")
+		// Then check user global config
 		configPath, err := configDir()
 		if err != nil {
 			return err

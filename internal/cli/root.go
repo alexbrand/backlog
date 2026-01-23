@@ -56,10 +56,10 @@ func init() {
 // initConfig reads in config file and ENV variables if set.
 func initConfig() error {
 	if err := config.Init(cfgFile); err != nil {
-		if verbose {
-			fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
-		}
-		// Continue without config file - commands that need it will fail gracefully
+		// If a config file exists but has errors (e.g., invalid YAML), fail with exit code 4
+		// The config.Init function already handles "file not found" gracefully
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		return ConfigError(err.Error())
 	}
 
 	// Apply config defaults to flags if not set via CLI

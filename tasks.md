@@ -51,13 +51,13 @@
 - [x] Implement `--verbose` / `-v` flag
 
 ### Configuration
-- [ ] Implement config file loading (`~/.config/backlog/config.yaml`)
-- [ ] Implement workspace selection logic
-- [ ] Implement `backlog config show`
+- [x] Implement config file loading (`~/.config/backlog/config.yaml` and `.backlog/config.yaml`)
+- [x] Implement workspace selection logic
+- [x] Implement `backlog config show`
 
 ### Error Handling
 - [x] Define exit codes (0=success, 1=error, 2=conflict, 3=not found, 4=config error)
-- [ ] Implement consistent error output format (stderr)
+- [x] Implement consistent error output format (stderr)
 - [ ] Implement JSON error output when `--format=json`
 
 ---
