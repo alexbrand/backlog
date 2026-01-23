@@ -316,9 +316,13 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 ## Phase 6: Linear Backend Specs
 
 ### Feature: Linear Connection (`linear_connect.feature`)
-- [ ] Scenario: Connect with valid API key succeeds
-- [ ] Scenario: Connect with invalid API key returns exit code 1
-- [ ] Scenario: Uses LINEAR_API_KEY environment variable
+- [x] Scenario: Connect with valid API key succeeds
+- [x] Scenario: Connect with invalid API key returns exit code 1
+- [x] Scenario: Connect with invalid API key returns JSON error format
+- [x] Scenario: Uses LINEAR_API_KEY environment variable
+- [x] Scenario: Missing API key returns auth error
+- [x] Scenario: Uses credentials.yaml API key when environment variable not set
+- [x] Scenario: Environment variable takes precedence over credentials.yaml
 
 ### Feature: Linear CRUD (`linear_crud.feature`)
 - [ ] Scenario: List fetches issues from team
@@ -336,9 +340,13 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [ ] Scenario: Release removes agent label
 
 ### Step Definitions - Phase 6
-- [ ] Implement mock Linear API for testing
-- [ ] Implement "Given a Linear team {string} with issues:"
-- [ ] Implement "Then the Linear issue {string} should have state {string}"
+- [x] Implement mock Linear API for testing
+- [x] Implement "Given a Linear team {string} with issues:"
+- [x] Implement "Then the Linear issue {string} should have state {string}"
+- [x] Implement "Given a mock Linear API server is running"
+- [x] Implement "Given the mock Linear API returns auth error for invalid keys"
+- [x] Implement "Given the mock Linear API expects key {string}"
+- [x] Implement "Then the Linear issue {string} should have label {string}"
 
 ---
 
@@ -388,5 +396,5 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 | Phase 3: Git Sync | Complete | 2 | 19 |
 | Phase 4: GitHub Issues | Complete | 6 | 73 |
 | Phase 5: GitHub Projects | Complete | 1 | 7 |
-| Phase 6: Linear | Not Started | 0 | 0 |
+| Phase 6: Linear | In Progress | 1 | 7 |
 | Cross-Cutting | Not Started | 0 | 0 |

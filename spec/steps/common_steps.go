@@ -69,10 +69,15 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 		return ctx, nil
 	})
 
-	// After each scenario: clean up test environment and mock server
+	// After each scenario: clean up test environment and mock servers
 	ctx.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
 		// Clean up mock GitHub server if running
 		if server := getMockGitHubServer(ctx); server != nil {
+			server.Close()
+		}
+
+		// Clean up mock Linear server if running
+		if server := getMockLinearServer(ctx); server != nil {
 			server.Close()
 		}
 
@@ -207,6 +212,18 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the mock GitHub API has no project with ID (\d+)$`, theMockGitHubAPIHasNoProjectWithID)
 	ctx.Step(`^the project item for issue "([^"]*)" should be in column "([^"]*)"$`, theProjectItemShouldBeInColumn)
 	ctx.Step(`^the issue "([^"]*)" is in project (\d+) column "([^"]*)"$`, theIssueIsInProjectColumn)
+
+	// Mock Linear API steps
+	ctx.Step(`^a mock Linear API server is running$`, aMockLinearAPIServerIsRunning)
+	ctx.Step(`^the mock Linear API returns auth error for invalid keys$`, theMockLinearAPIReturnsAuthErrorForInvalidKeys)
+	ctx.Step(`^the mock Linear API expects key "([^"]*)"$`, theMockLinearAPIExpectsKey)
+	ctx.Step(`^the mock Linear API has the following issues:$`, theMockLinearAPIHasTheFollowingIssues)
+	ctx.Step(`^the mock Linear API authenticated user is "([^"]*)"$`, theMockLinearAPIAuthenticatedUserIs)
+
+	// Linear assertion steps
+	ctx.Step(`^a Linear team "([^"]*)" with issues:$`, aLinearTeamWithIssues)
+	ctx.Step(`^the Linear issue "([^"]*)" should have state "([^"]*)"$`, theLinearIssueShouldHaveState)
+	ctx.Step(`^the Linear issue "([^"]*)" should have label "([^"]*)"$`, theLinearIssueShouldHaveLabel)
 }
 
 // aFreshBacklogDirectory creates a new empty .backlog directory.
@@ -2321,12 +2338,21 @@ func theRemoteRepositoryIsUnreachable(ctx context.Context) (context.Context, err
 // ============================================================================
 
 const (
-	mockGitHubServerKey contextKey = "mockGitHubServer"
+	mockGitHubServerKey  contextKey = "mockGitHubServer"
+	mockLinearServerKey  contextKey = "mockLinearServer"
 )
 
 // getMockGitHubServer retrieves the MockGitHubServer from context.
 func getMockGitHubServer(ctx context.Context) *support.MockGitHubServer {
 	if server, ok := ctx.Value(mockGitHubServerKey).(*support.MockGitHubServer); ok {
+		return server
+	}
+	return nil
+}
+
+// getMockLinearServer retrieves the MockLinearServer from context.
+func getMockLinearServer(ctx context.Context) *support.MockLinearServer {
+	if server, ok := ctx.Value(mockLinearServerKey).(*support.MockLinearServer); ok {
 		return server
 	}
 	return nil
@@ -2780,4 +2806,208 @@ func theIssueIsInProjectColumn(ctx context.Context, issueID string, projectNumbe
 
 	server.SetProjectItem(projectNumber, issueNumber, columnID)
 	return ctx, nil
+}
+
+// ============================================================================
+// Mock Linear API Step Definitions
+// ============================================================================
+
+// aMockLinearAPIServerIsRunning starts a mock Linear API server.
+func aMockLinearAPIServerIsRunning(ctx context.Context) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	// Create and start the mock server
+	server := support.NewMockLinearServer()
+
+	// Set the LINEAR_API_URL environment variable to point to the mock server
+	env.SetEnv("LINEAR_API_URL", server.URL)
+
+	// Store the server in context for cleanup and configuration
+	ctx = context.WithValue(ctx, mockLinearServerKey, server)
+
+	return ctx, nil
+}
+
+// theMockLinearAPIReturnsAuthErrorForInvalidKeys configures the mock to return auth errors.
+func theMockLinearAPIReturnsAuthErrorForInvalidKeys(ctx context.Context) (context.Context, error) {
+	server := getMockLinearServer(ctx)
+	if server == nil {
+		return ctx, fmt.Errorf("mock Linear API server not running - call 'a mock Linear API server is running' first")
+	}
+
+	server.AuthErrorEnabled = true
+	return ctx, nil
+}
+
+// theMockLinearAPIExpectsKey configures the mock to expect a specific API key.
+func theMockLinearAPIExpectsKey(ctx context.Context, apiKey string) (context.Context, error) {
+	server := getMockLinearServer(ctx)
+	if server == nil {
+		return ctx, fmt.Errorf("mock Linear API server not running - call 'a mock Linear API server is running' first")
+	}
+
+	server.ExpectedAPIKey = apiKey
+	return ctx, nil
+}
+
+// theMockLinearAPIHasTheFollowingIssues sets up mock issues for the Linear API.
+func theMockLinearAPIHasTheFollowingIssues(ctx context.Context, table *godog.Table) (context.Context, error) {
+	server := getMockLinearServer(ctx)
+	if server == nil {
+		return ctx, fmt.Errorf("mock Linear API server not running - call 'a mock Linear API server is running' first")
+	}
+
+	if len(table.Rows) < 2 {
+		return ctx, fmt.Errorf("table must have at least a header row and one data row")
+	}
+
+	header := table.Rows[0]
+	colIndex := make(map[string]int)
+	for i, cell := range header.Cells {
+		colIndex[cell.Value] = i
+	}
+
+	var issues []support.MockLinearIssue
+	for _, row := range table.Rows[1:] {
+		getValue := func(col string) string {
+			if idx, ok := colIndex[col]; ok && idx < len(row.Cells) {
+				return row.Cells[idx].Value
+			}
+			return ""
+		}
+
+		issue := support.MockLinearIssue{
+			ID:          getValue("id"),
+			Identifier:  getValue("identifier"),
+			Title:       getValue("title"),
+			State:       getValue("state"),
+			Assignee:    getValue("assignee"),
+			Description: getValue("description"),
+			TeamKey:     getValue("team"),
+		}
+
+		// Default team if not specified
+		if issue.TeamKey == "" {
+			issue.TeamKey = "ENG"
+		}
+
+		// Generate ID if not specified
+		if issue.ID == "" {
+			issue.ID = "issue-" + issue.Identifier
+		}
+
+		// Parse priority
+		if priorityStr := getValue("priority"); priorityStr != "" {
+			switch strings.ToLower(priorityStr) {
+			case "urgent":
+				issue.Priority = 1
+			case "high":
+				issue.Priority = 2
+			case "medium":
+				issue.Priority = 3
+			case "low":
+				issue.Priority = 4
+			default:
+				issue.Priority = 0
+			}
+		}
+
+		// Parse labels as comma-separated list
+		if labelsStr := getValue("labels"); labelsStr != "" {
+			for _, label := range strings.Split(labelsStr, ",") {
+				label = strings.TrimSpace(label)
+				if label != "" {
+					issue.Labels = append(issue.Labels, label)
+				}
+			}
+		}
+
+		issues = append(issues, issue)
+	}
+
+	// Set the issues on the mock server
+	server.SetIssues(issues)
+	return ctx, nil
+}
+
+// theMockLinearAPIAuthenticatedUserIs sets the authenticated user for the mock Linear API.
+func theMockLinearAPIAuthenticatedUserIs(ctx context.Context, username string) (context.Context, error) {
+	server := getMockLinearServer(ctx)
+	if server == nil {
+		return ctx, fmt.Errorf("mock Linear API server not running - call 'a mock Linear API server is running' first")
+	}
+
+	server.AuthenticatedUser = username
+	return ctx, nil
+}
+
+// aLinearTeamWithIssues sets up a mock Linear team with the specified issues.
+// This is a convenience step that combines starting the mock server and setting up issues.
+func aLinearTeamWithIssues(ctx context.Context, teamKey string, table *godog.Table) (context.Context, error) {
+	// First ensure the mock server is running
+	server := getMockLinearServer(ctx)
+	if server == nil {
+		// Start the mock server
+		var err error
+		ctx, err = aMockLinearAPIServerIsRunning(ctx)
+		if err != nil {
+			return ctx, fmt.Errorf("failed to start mock Linear API server: %w", err)
+		}
+	}
+
+	// Now add the issues using the existing step
+	return theMockLinearAPIHasTheFollowingIssues(ctx, table)
+}
+
+// theLinearIssueShouldHaveState verifies that a Linear issue has the specified state.
+func theLinearIssueShouldHaveState(ctx context.Context, issueID, expectedState string) error {
+	server := getMockLinearServer(ctx)
+	if server == nil {
+		return fmt.Errorf("mock Linear API server not running")
+	}
+
+	// Try to find by identifier first, then by ID
+	issue := server.GetIssueByIdentifier(issueID)
+	if issue == nil {
+		issue = server.GetIssue(issueID)
+	}
+
+	if issue == nil {
+		return fmt.Errorf("issue %q not found", issueID)
+	}
+
+	if issue.State != expectedState {
+		return fmt.Errorf("expected issue %q to have state %q, got %q", issueID, expectedState, issue.State)
+	}
+
+	return nil
+}
+
+// theLinearIssueShouldHaveLabel verifies that a Linear issue has the specified label.
+func theLinearIssueShouldHaveLabel(ctx context.Context, issueID, label string) error {
+	server := getMockLinearServer(ctx)
+	if server == nil {
+		return fmt.Errorf("mock Linear API server not running")
+	}
+
+	// Try to find by identifier first, then by ID
+	issue := server.GetIssueByIdentifier(issueID)
+	if issue == nil {
+		issue = server.GetIssue(issueID)
+	}
+
+	if issue == nil {
+		return fmt.Errorf("issue %q not found", issueID)
+	}
+
+	for _, l := range issue.Labels {
+		if l == label {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("issue %q does not have label %q (has: %v)", issueID, label, issue.Labels)
 }
