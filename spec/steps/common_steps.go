@@ -106,6 +106,7 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the JSON output should be valid$`, theJSONOutputShouldBeValid)
 	ctx.Step(`^the JSON output should have "([^"]*)" as an array$`, theJSONOutputShouldHaveAsAnArray)
 	ctx.Step(`^the JSON output should have array "([^"]*)" containing "([^"]*)"$`, theJSONOutputShouldHaveArrayContaining)
+	ctx.Step(`^the JSON output should have array length "([^"]*)" equal to (\d+)$`, theJSONOutputShouldHaveArrayLengthEqualTo)
 }
 
 // aFreshBacklogDirectory creates a new empty .backlog directory.
@@ -559,6 +560,26 @@ func theJSONOutputShouldHaveArrayContaining(ctx context.Context, path, expected 
 	if !jsonResult.ContainsString(path, expected) {
 		arr := jsonResult.GetArray(path)
 		return fmt.Errorf("expected JSON array at %q to contain %q, but it contains: %v", path, expected, arr)
+	}
+
+	return nil
+}
+
+// theJSONOutputShouldHaveArrayLengthEqualTo verifies an array at a JSON path has the expected length.
+func theJSONOutputShouldHaveArrayLengthEqualTo(ctx context.Context, path string, expected int) error {
+	result := getLastResult(ctx)
+	if result == nil {
+		return fmt.Errorf("no command has been run")
+	}
+
+	jsonResult := support.ParseJSON(result.Stdout)
+	if !jsonResult.Valid() {
+		return fmt.Errorf("stdout is not valid JSON: %s\nstdout:\n%s", jsonResult.Error(), result.Stdout)
+	}
+
+	arr := jsonResult.GetArray(path)
+	if len(arr) != expected {
+		return fmt.Errorf("expected JSON array at %q to have length %d, got %d", path, expected, len(arr))
 	}
 
 	return nil

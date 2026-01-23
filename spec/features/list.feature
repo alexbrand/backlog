@@ -212,3 +212,15 @@ Feature: Listing Tasks
     And stdout should contain "Third task"
     And stdout should not contain "Fourth task"
     And stdout should not contain "Fifth task"
+
+  Scenario: List returns empty when no tasks match
+    Given a backlog with the following tasks:
+      | id    | title           | status      | priority |
+      | task1 | First task      | todo        | high     |
+      | task2 | Second task     | in-progress | medium   |
+    When I run "backlog list --status=review -f json"
+    Then the exit code should be 0
+    And the JSON output should be valid
+    And the JSON output should have "count" equal to "0"
+    And the JSON output should have "tasks" as an array
+    And the JSON output should have array length "tasks" equal to 0
