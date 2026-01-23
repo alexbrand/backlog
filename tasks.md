@@ -37,7 +37,7 @@
 - [x] Implement `Move()` — move file between status directories
 
 ### CLI Commands - Phase 1
-- [ ] Implement `backlog init` — create `.backlog/` directory structure
+- [x] Implement `backlog init` — create `.backlog/` directory structure
 - [ ] Implement `backlog add <title>` with flags (`--priority`, `--label`, `--description`, `--body-file`, `--status`)
 - [ ] Implement `backlog list` with filters (`--status`, `--assignee`, `--priority`, `--label`, `--limit`)
 - [ ] Implement `backlog show <id>` with `--comments` flag
