@@ -9,6 +9,10 @@
 coverage.out
 coverage.html
 
+# Spec reports
+cucumber.json
+report.html
+
 # IDE
 .idea/
 .vscode/

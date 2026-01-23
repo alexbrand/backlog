@@ -386,7 +386,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Add `make spec-github` for GitHub backend specs (requires mock)
 - [x] Configure GitHub Actions to run specs on PR
 - [x] Generate test coverage report
-- [ ] Generate HTML spec report for documentation
+- [x] Generate HTML spec report for documentation
 
 ### Spec Documentation
 - [ ] Add spec README explaining how to run tests
