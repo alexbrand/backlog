@@ -118,6 +118,8 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the task "([^"]*)" should have assignee "([^"]*)"$`, theTaskShouldHaveAssignee)
 	ctx.Step(`^the task "([^"]*)" should have label "([^"]*)"$`, theTaskShouldHaveLabel)
 	ctx.Step(`^the task "([^"]*)" should have comment containing "([^"]*)"$`, theTaskShouldHaveCommentContaining)
+	ctx.Step(`^the task "([^"]*)" should not have label "([^"]*)"$`, theTaskShouldNotHaveLabel)
+	ctx.Step(`^the task "([^"]*)" should have description containing "([^"]*)"$`, theTaskShouldHaveDescriptionContaining)
 }
 
 // aFreshBacklogDirectory creates a new empty .backlog directory.
@@ -806,6 +808,46 @@ func theTaskShouldHaveCommentContaining(ctx context.Context, taskID, expectedTex
 
 	if !strings.Contains(string(content), expectedText) {
 		return fmt.Errorf("expected task %s to have comment containing %q, but it doesn't.\nFile content:\n%s", taskID, expectedText, string(content))
+	}
+
+	return nil
+}
+
+// theTaskShouldNotHaveLabel verifies a task does not have a specific label.
+func theTaskShouldNotHaveLabel(ctx context.Context, taskID, unexpectedLabel string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	reader := support.NewTaskFileReader(env.Path(".backlog"))
+	task := reader.ReadTask(taskID)
+	if task.ParseErr != nil {
+		return fmt.Errorf("failed to read task %s: %w", taskID, task.ParseErr)
+	}
+
+	if task.HasLabel(unexpectedLabel) {
+		return fmt.Errorf("expected task %s to not have label %q, but it has labels: %v", taskID, unexpectedLabel, task.Labels)
+	}
+
+	return nil
+}
+
+// theTaskShouldHaveDescriptionContaining verifies a task description contains expected text.
+func theTaskShouldHaveDescriptionContaining(ctx context.Context, taskID, expectedText string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	reader := support.NewTaskFileReader(env.Path(".backlog"))
+	task := reader.ReadTask(taskID)
+	if task.ParseErr != nil {
+		return fmt.Errorf("failed to read task %s: %w", taskID, task.ParseErr)
+	}
+
+	if !strings.Contains(task.Description, expectedText) {
+		return fmt.Errorf("expected task %s description to contain %q, got:\n%s", taskID, expectedText, task.Description)
 	}
 
 	return nil
