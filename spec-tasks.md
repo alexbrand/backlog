@@ -64,7 +64,7 @@ This plan covers implementing a Gherkin-based executable specification using [go
 - [x] Scenario: List tasks in table format (default)
 - [x] Scenario: List tasks in JSON format
 - [x] Scenario: List tasks in plain format
-- [ ] Scenario: List tasks in id-only format
+- [x] Scenario: List tasks in id-only format
 - [ ] Scenario: List with status filter
 - [ ] Scenario: List with multiple status values
 - [ ] Scenario: List with priority filter

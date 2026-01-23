@@ -81,3 +81,22 @@ Feature: Listing Tasks
     And stdout should contain "Third task"
     And stdout should not contain "ID"
     And stdout should not contain "STATUS"
+
+  Scenario: List tasks in id-only format
+    Given a backlog with the following tasks:
+      | id    | title           | status      | priority |
+      | task1 | First task      | todo        | high     |
+      | task2 | Second task     | in-progress | medium   |
+      | task3 | Third task      | backlog     | low      |
+    When I run "backlog list -f id-only"
+    Then the exit code should be 0
+    And stdout should contain "task1"
+    And stdout should contain "task2"
+    And stdout should contain "task3"
+    And stdout should not contain "First task"
+    And stdout should not contain "Second task"
+    And stdout should not contain "Third task"
+    And stdout should not contain "ID"
+    And stdout should not contain "STATUS"
+    And stdout should not contain "PRIORITY"
+    And stdout should not contain "TITLE"
