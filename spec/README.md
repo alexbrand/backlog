@@ -236,3 +236,175 @@ make spec-report-html
 ```
 
 The HTML report serves as living documentation, showing all features and their scenarios with pass/fail status.
+
+## Adding New Scenarios
+
+This section explains how to add new test scenarios to the executable specification.
+
+### 1. Choose or Create a Feature File
+
+Feature files live in `spec/features/` and are organized by functionality:
+
+- **CRUD operations**: `init.feature`, `add.feature`, `list.feature`, `show.feature`, `move.feature`, `edit.feature`
+- **Agent coordination**: `claim.feature`, `release.feature`, `next.feature`, `comment.feature`, `locking.feature`
+- **Output formats**: `output_table.feature`, `output_json.feature`, `output_plain.feature`
+- **Configuration**: `config.feature`, `global_flags.feature`
+- **Error handling**: `errors.feature`
+- **Backend-specific**: `github_*.feature`, `linear_*.feature`, `git_*.feature`
+- **Integration**: `multi_backend.feature`, `agent_workflow.feature`
+
+If your scenario fits an existing feature, add it there. Otherwise, create a new `.feature` file.
+
+### 2. Write the Feature Description
+
+Every feature file should start with a description explaining the feature's purpose:
+
+```gherkin
+Feature: Feature Name
+  As a [type of user]
+  I want to [do something]
+  So that [benefit/value]
+```
+
+### 3. Write the Scenario
+
+Scenarios follow the Given-When-Then structure:
+
+```gherkin
+Scenario: Descriptive name of what is being tested
+  Given [precondition - set up the test state]
+  And [additional precondition if needed]
+  When [action - the command being tested]
+  Then [expected outcome]
+  And [additional expectations]
+```
+
+**Example:**
+
+```gherkin
+Scenario: Add task with custom priority
+  Given a fresh backlog directory
+  When I run "backlog add 'Important task' --priority=high"
+  Then the exit code should be 0
+  And a task file should exist in "backlog" directory
+  And the created task should have priority "high"
+```
+
+### 4. Use Existing Step Definitions
+
+Before creating new step definitions, check if an existing step can be reused. Common steps are documented in the "Available Steps" section above.
+
+**Tips:**
+
+- Use `Given a fresh backlog directory` to start with a clean state
+- Use `Given a backlog with the following tasks:` for scenarios that need pre-existing data
+- Use `When I run "command"` for all CLI invocations
+- Use appropriate `Then` steps for verification
+
+### 5. Use Data Tables for Multiple Items
+
+When setting up multiple tasks or verifying multiple values, use Gherkin data tables:
+
+```gherkin
+Scenario: List multiple tasks
+  Given a backlog with the following tasks:
+    | id  | title           | status      | priority |
+    | 001 | First task      | todo        | high     |
+    | 002 | Second task     | in-progress | medium   |
+    | 003 | Third task      | backlog     | low      |
+  When I run "backlog list -f json"
+  Then the exit code should be 0
+  And the JSON output should have array length "tasks" equal to 3
+```
+
+### 6. Use Scenario Outlines for Repeated Tests
+
+When testing the same behavior with different inputs, use Scenario Outlines:
+
+```gherkin
+Scenario Outline: Move task to each valid status
+  Given a fresh backlog directory
+  And a task "Test task" exists with status "backlog"
+  When I run "backlog move 001 <status>"
+  Then the exit code should be 0
+  And the task "Test task" should have status "<status>"
+
+  Examples:
+    | status      |
+    | todo        |
+    | in-progress |
+    | review      |
+    | done        |
+```
+
+### 7. Use Tags for Categorization
+
+Apply appropriate tags to scenarios for selective execution:
+
+```gherkin
+@local
+Feature: Local Backend Tasks
+  ...
+
+@github @remote
+Scenario: GitHub-specific behavior
+  ...
+
+@wip
+Scenario: Work in progress (not yet implemented)
+  ...
+```
+
+### 8. Create New Step Definitions (If Needed)
+
+If no existing step matches your needs, add a new step definition in `spec/steps/common_steps.go`:
+
+1. **Define the step function:**
+
+```go
+// myNewStep implements a custom verification.
+func myNewStep(ctx context.Context, param string) error {
+    env := getTestEnv(ctx)
+    if env == nil {
+        return fmt.Errorf("test environment not initialized")
+    }
+
+    // Your verification logic here
+
+    return nil
+}
+```
+
+2. **Register the step in `InitializeCommonSteps`:**
+
+```go
+func InitializeCommonSteps(ctx *godog.ScenarioContext) {
+    // ... existing steps ...
+
+    ctx.Step(`^my new step with "([^"]*)"$`, myNewStep)
+}
+```
+
+3. **Follow the naming conventions** (see "Step Definition Conventions" below).
+
+### 9. Run Your Scenario
+
+Test your new scenario:
+
+```bash
+# Run all specs to see if it passes
+make spec
+
+# Run with verbose output
+cd spec && go test -run TestFeatures -v .
+
+# Run specific tag
+GODOG_TAGS="@local" make spec
+```
+
+### 10. Update spec-tasks.md
+
+After adding scenarios, update the `spec-tasks.md` file to track what was added:
+
+1. Mark any related tasks as complete
+2. Update the Progress Summary table with new scenario counts
