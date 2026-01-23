@@ -248,7 +248,13 @@ func (l *Local) Update(id string, changes backend.TaskChanges) (*backend.Task, e
 		return nil, errors.New("not connected")
 	}
 
-	task, err := l.findTask(id)
+	// Find the old file path before applying changes
+	oldFilePath, err := l.findTaskFile(id)
+	if err != nil {
+		return nil, err
+	}
+
+	task, err := l.readTaskFile(oldFilePath, l.statusFromPath(oldFilePath))
 	if err != nil {
 		return nil, err
 	}
@@ -301,6 +307,13 @@ func (l *Local) Update(id string, changes backend.TaskChanges) (*backend.Task, e
 	// Write the updated task
 	if err := l.writeTask(task); err != nil {
 		return nil, fmt.Errorf("failed to write task: %w", err)
+	}
+
+	// Remove old file if the filename changed (due to title change)
+	newFilename := generateFilename(task.ID, task.Title)
+	newFilePath := filepath.Join(l.path, string(task.Status), newFilename)
+	if oldFilePath != newFilePath {
+		os.Remove(oldFilePath)
 	}
 
 	return task, nil

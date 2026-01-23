@@ -42,7 +42,7 @@
 - [x] Implement `backlog list` with filters (`--status`, `--assignee`, `--priority`, `--label`, `--limit`)
 - [x] Implement `backlog show <id>` with `--comments` flag
 - [x] Implement `backlog move <id> <status>`
-- [ ] Implement `backlog edit <id>` with flags (`--title`, `--priority`, `--add-label`, `--remove-label`, `--description`)
+- [x] Implement `backlog edit <id>` with flags (`--title`, `--priority`, `--add-label`, `--remove-label`, `--description`)
 
 ### Global Flags
 - [x] Implement `--workspace` / `-w` flag
@@ -216,7 +216,7 @@
 
 | Phase | Status | Tasks |
 |-------|--------|-------|
-| Phase 1: Local CRUD | In Progress | 15/X |
+| Phase 1: Local CRUD | In Progress | 16/X |
 | Phase 2: Agent Coordination | Not Started | 0/X |
 | Phase 3: Git Sync | Not Started | 0/X |
 | Phase 4: GitHub Issues | Not Started | 0/X |

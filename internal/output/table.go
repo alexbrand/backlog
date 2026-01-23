@@ -129,6 +129,12 @@ func (f *TableFormatter) FormatMoved(w io.Writer, task *backend.Task, oldStatus,
 	return nil
 }
 
+// FormatUpdated outputs the result of updating a task.
+func (f *TableFormatter) FormatUpdated(w io.Writer, task *backend.Task) error {
+	fmt.Fprintf(w, "Updated %s: %s\n", task.ID, task.Title)
+	return nil
+}
+
 // FormatError outputs an error message.
 func (f *TableFormatter) FormatError(w io.Writer, code string, message string, details map[string]any) error {
 	fmt.Fprintf(w, "error: %s\n", message)
