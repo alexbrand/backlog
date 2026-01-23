@@ -118,6 +118,8 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the JSON output should have array length "([^"]*)" equal to (\d+)$`, theJSONOutputShouldHaveArrayLengthEqualTo)
 	ctx.Step(`^the JSON output should have "([^"]*)" as an object$`, theJSONOutputShouldHaveAsAnObject)
 	ctx.Step(`^the JSON output should have "([^"]*)" containing "([^"]*)"$`, theJSONOutputShouldHaveContaining)
+	ctx.Step(`^the JSON output should have "([^"]*)" matching pattern "([^"]*)"$`, theJSONOutputShouldHaveMatchingPattern)
+	ctx.Step(`^the JSON output should not have array "([^"]*)" containing "([^"]*)"$`, theJSONOutputShouldNotHaveArrayContaining)
 	ctx.Step(`^task "([^"]*)" has the following comments:$`, taskHasTheFollowingComments)
 
 	// Config steps
@@ -697,6 +699,51 @@ func theJSONOutputShouldHaveContaining(ctx context.Context, path, expected strin
 	actual := jsonResult.GetString(path)
 	if !strings.Contains(actual, expected) {
 		return fmt.Errorf("expected JSON path %q to contain %q, got %q", path, expected, actual)
+	}
+
+	return nil
+}
+
+// theJSONOutputShouldHaveMatchingPattern verifies a value at a JSON path matches a regex pattern.
+func theJSONOutputShouldHaveMatchingPattern(ctx context.Context, path, pattern string) error {
+	result := getLastResult(ctx)
+	if result == nil {
+		return fmt.Errorf("no command has been run")
+	}
+
+	jsonResult := support.ParseJSON(result.Stdout)
+	if !jsonResult.Valid() {
+		return fmt.Errorf("stdout is not valid JSON: %s\nstdout:\n%s", jsonResult.Error(), result.Stdout)
+	}
+
+	actual := jsonResult.GetString(path)
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return fmt.Errorf("invalid regex pattern %q: %v", pattern, err)
+	}
+
+	if !re.MatchString(actual) {
+		return fmt.Errorf("expected JSON path %q to match pattern %q, got %q", path, pattern, actual)
+	}
+
+	return nil
+}
+
+// theJSONOutputShouldNotHaveArrayContaining verifies an array at a JSON path does NOT contain a value.
+func theJSONOutputShouldNotHaveArrayContaining(ctx context.Context, path, unexpected string) error {
+	result := getLastResult(ctx)
+	if result == nil {
+		return fmt.Errorf("no command has been run")
+	}
+
+	jsonResult := support.ParseJSON(result.Stdout)
+	if !jsonResult.Valid() {
+		return fmt.Errorf("stdout is not valid JSON: %s\nstdout:\n%s", jsonResult.Error(), result.Stdout)
+	}
+
+	if jsonResult.ContainsString(path, unexpected) {
+		arr := jsonResult.GetArray(path)
+		return fmt.Errorf("expected JSON array at %q to NOT contain %q, but it does: %v", path, unexpected, arr)
 	}
 
 	return nil

@@ -267,10 +267,10 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: List respects limit
 
 ### Feature: GitHub CRUD (`github_crud.feature`)
-- [ ] Scenario: Add creates GitHub issue
-- [ ] Scenario: Show fetches issue details
-- [ ] Scenario: Edit updates issue fields
-- [ ] Scenario: Move updates status labels
+- [x] Scenario: Add creates GitHub issue
+- [x] Scenario: Show fetches issue details
+- [x] Scenario: Edit updates issue fields
+- [x] Scenario: Move updates status labels
 
 ### Feature: GitHub Status Mapping (`github_status.feature`)
 - [ ] Scenario: Default status mapping (labels)
@@ -385,7 +385,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 | Phase 1d: Error Handling | Complete | 1 | 12 |
 | Phase 2: Agent Coordination | Complete | 5 | 46 |
 | Phase 3: Git Sync | Complete | 2 | 19 |
-| Phase 4: GitHub Issues | In Progress | 2 | 15 |
+| Phase 4: GitHub Issues | In Progress | 3 | 35 |
 | Phase 5: GitHub Projects | Not Started | 0 | 0 |
 | Phase 6: Linear | Not Started | 0 | 0 |
 | Cross-Cutting | Not Started | 0 | 0 |
