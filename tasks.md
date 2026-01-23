@@ -210,7 +210,7 @@
 
 ### Build & Distribution
 - [x] Set up cross-compilation (darwin/arm64, linux/amd64, windows/amd64)
-- [ ] Create GitHub Actions workflow for releases
+- [x] Create GitHub Actions workflow for releases
 - [ ] Set up Homebrew tap
 - [ ] Publish to `go install`
 
