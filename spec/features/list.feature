@@ -196,3 +196,19 @@ Feature: Listing Tasks
     And stdout should not contain "Alice's task"
     And stdout should not contain "Bob's task"
     And stdout should not contain "Carol's task"
+
+  Scenario: List with limit
+    Given a backlog with the following tasks:
+      | id    | title           | status      | priority |
+      | task1 | First task      | todo        | urgent   |
+      | task2 | Second task     | todo        | high     |
+      | task3 | Third task      | todo        | medium   |
+      | task4 | Fourth task     | todo        | low      |
+      | task5 | Fifth task      | todo        | none     |
+    When I run "backlog list --limit=3"
+    Then the exit code should be 0
+    And stdout should contain "First task"
+    And stdout should contain "Second task"
+    And stdout should contain "Third task"
+    And stdout should not contain "Fourth task"
+    And stdout should not contain "Fifth task"
