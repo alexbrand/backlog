@@ -206,6 +206,7 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^a GitHub project (\d+) with columns:$`, aGitHubProjectWithColumns)
 	ctx.Step(`^the mock GitHub API has no project with ID (\d+)$`, theMockGitHubAPIHasNoProjectWithID)
 	ctx.Step(`^the project item for issue "([^"]*)" should be in column "([^"]*)"$`, theProjectItemShouldBeInColumn)
+	ctx.Step(`^the issue "([^"]*)" is in project (\d+) column "([^"]*)"$`, theIssueIsInProjectColumn)
 }
 
 // aFreshBacklogDirectory creates a new empty .backlog directory.
@@ -2745,4 +2746,38 @@ func theProjectItemShouldBeInColumn(ctx context.Context, issueID, columnName str
 	}
 
 	return fmt.Errorf("issue %s is not in any project", issueID)
+}
+
+// theIssueIsInProjectColumn adds an issue to a project in the specified column.
+func theIssueIsInProjectColumn(ctx context.Context, issueID string, projectNumber int, columnName string) (context.Context, error) {
+	server := getMockGitHubServer(ctx)
+	if server == nil {
+		return ctx, fmt.Errorf("mock GitHub API server not running - call 'a mock GitHub API server is running' first")
+	}
+
+	issueNumber := parseGitHubIssueNumber(issueID)
+	if issueNumber <= 0 {
+		return ctx, fmt.Errorf("invalid issue ID format: %s (expected 'GH-{number}' or '{number}')", issueID)
+	}
+
+	// Find the column ID from the column name
+	project := server.GetProject(projectNumber)
+	if project == nil {
+		return ctx, fmt.Errorf("project %d not found - call 'a GitHub project %d with columns:' first", projectNumber, projectNumber)
+	}
+
+	var columnID string
+	for _, col := range project.Columns {
+		if col.Name == columnName {
+			columnID = col.ID
+			break
+		}
+	}
+
+	if columnID == "" {
+		return ctx, fmt.Errorf("column %q not found in project %d", columnName, projectNumber)
+	}
+
+	server.SetProjectItem(projectNumber, issueNumber, columnID)
+	return ctx, nil
 }

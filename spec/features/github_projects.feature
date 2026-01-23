@@ -80,3 +80,66 @@ Feature: GitHub Projects
     Then the exit code should be 0
     And stdout should contain "github"
     And stdout should contain "healthy"
+
+  @github @projects
+  Scenario: List shows tasks from project board
+    Given a GitHub project 1 with columns:
+      | name        | id   |
+      | Backlog     | COL1 |
+      | Todo        | COL2 |
+      | In Progress | COL3 |
+      | Done        | COL4 |
+    And the mock GitHub API has the following issues:
+      | number | title              | state | labels |
+      | 1      | First task         | open  |        |
+      | 2      | Second task        | open  |        |
+      | 3      | Third task         | open  |        |
+      | 4      | Completed task     | closed|        |
+    And the issue "1" is in project 1 column "Backlog"
+    And the issue "2" is in project 1 column "Todo"
+    And the issue "3" is in project 1 column "In Progress"
+    And the issue "4" is in project 1 column "Done"
+    When I run "backlog list --status=all -f json"
+    Then the exit code should be 0
+    And the JSON output should be valid
+    And the JSON output should have "tasks" as an array
+    # When using project, status should be read from project column, not labels
+    And the JSON output should have "tasks[0].status" equal to "backlog"
+    And the JSON output should have "tasks[1].status" equal to "todo"
+    And the JSON output should have "tasks[2].status" equal to "in-progress"
+    And the JSON output should have "tasks[3].status" equal to "done"
+
+  @github @projects
+  Scenario: Move changes project column
+    Given a GitHub project 1 with columns:
+      | name        | id   |
+      | Backlog     | COL1 |
+      | Todo        | COL2 |
+      | In Progress | COL3 |
+      | Done        | COL4 |
+    And the mock GitHub API has the following issues:
+      | number | title              | state | labels |
+      | 1      | Task to move       | open  |        |
+    And the issue "1" is in project 1 column "Backlog"
+    When I run "backlog move GH-1 in-progress"
+    Then the exit code should be 0
+    And the project item for issue "GH-1" should be in column "In Progress"
+
+  @github @projects
+  Scenario: Status read from project field
+    Given a GitHub project 1 with columns:
+      | name        | id   |
+      | Backlog     | COL1 |
+      | Todo        | COL2 |
+      | In Progress | COL3 |
+      | Review      | COL4 |
+      | Done        | COL5 |
+    And the mock GitHub API has the following issues:
+      | number | title              | state | labels      |
+      | 1      | Task with label    | open  | in-progress |
+    And the issue "1" is in project 1 column "Review"
+    When I run "backlog show GH-1 -f json"
+    Then the exit code should be 0
+    And the JSON output should be valid
+    # When project is configured, status should come from project column, not labels
+    And the JSON output should have "status" equal to "review"

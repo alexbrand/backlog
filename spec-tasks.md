@@ -301,14 +301,15 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 
 ### Feature: GitHub Projects (`github_projects.feature`)
 - [x] Scenario: Connect to repository with project
-- [ ] Scenario: List shows tasks from project board
-- [ ] Scenario: Move changes project column
-- [ ] Scenario: Status read from project field
+- [x] Scenario: List shows tasks from project board
+- [x] Scenario: Move changes project column
+- [x] Scenario: Status read from project field
 
 ### Step Definitions - Phase 5
 - [x] Implement mock GraphQL API for Projects
 - [x] Implement "Given a GitHub project {int} with columns:"
 - [x] Implement "Then the project item should be in column {string}"
+- [x] Implement "Given the issue {string} is in project {int} column {string}"
 
 ---
 
@@ -386,6 +387,6 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 | Phase 2: Agent Coordination | Complete | 5 | 46 |
 | Phase 3: Git Sync | Complete | 2 | 19 |
 | Phase 4: GitHub Issues | Complete | 6 | 73 |
-| Phase 5: GitHub Projects | In Progress | 1 | 4 |
+| Phase 5: GitHub Projects | Complete | 1 | 7 |
 | Phase 6: Linear | Not Started | 0 | 0 |
 | Cross-Cutting | Not Started | 0 | 0 |
