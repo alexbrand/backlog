@@ -108,6 +108,8 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the JSON output should have "([^"]*)" as an array$`, theJSONOutputShouldHaveAsAnArray)
 	ctx.Step(`^the JSON output should have array "([^"]*)" containing "([^"]*)"$`, theJSONOutputShouldHaveArrayContaining)
 	ctx.Step(`^the JSON output should have array length "([^"]*)" equal to (\d+)$`, theJSONOutputShouldHaveArrayLengthEqualTo)
+	ctx.Step(`^the JSON output should have "([^"]*)" as an object$`, theJSONOutputShouldHaveAsAnObject)
+	ctx.Step(`^the JSON output should have "([^"]*)" containing "([^"]*)"$`, theJSONOutputShouldHaveContaining)
 	ctx.Step(`^task "([^"]*)" has the following comments:$`, taskHasTheFollowingComments)
 
 	// Task state verification steps
@@ -593,6 +595,45 @@ func theJSONOutputShouldHaveArrayLengthEqualTo(ctx context.Context, path string,
 	arr := jsonResult.GetArray(path)
 	if len(arr) != expected {
 		return fmt.Errorf("expected JSON array at %q to have length %d, got %d", path, expected, len(arr))
+	}
+
+	return nil
+}
+
+// theJSONOutputShouldHaveAsAnObject verifies a JSON path contains an object.
+func theJSONOutputShouldHaveAsAnObject(ctx context.Context, path string) error {
+	result := getLastResult(ctx)
+	if result == nil {
+		return fmt.Errorf("no command has been run")
+	}
+
+	jsonResult := support.ParseJSON(result.Stdout)
+	if !jsonResult.Valid() {
+		return fmt.Errorf("stdout is not valid JSON: %s\nstdout:\n%s", jsonResult.Error(), result.Stdout)
+	}
+
+	if !jsonResult.IsObject(path) {
+		return fmt.Errorf("expected JSON path %q to be an object, but it is not\nstdout:\n%s", path, result.Stdout)
+	}
+
+	return nil
+}
+
+// theJSONOutputShouldHaveContaining verifies a string value at a JSON path contains a substring.
+func theJSONOutputShouldHaveContaining(ctx context.Context, path, expected string) error {
+	result := getLastResult(ctx)
+	if result == nil {
+		return fmt.Errorf("no command has been run")
+	}
+
+	jsonResult := support.ParseJSON(result.Stdout)
+	if !jsonResult.Valid() {
+		return fmt.Errorf("stdout is not valid JSON: %s\nstdout:\n%s", jsonResult.Error(), result.Stdout)
+	}
+
+	actual := jsonResult.GetString(path)
+	if !strings.Contains(actual, expected) {
+		return fmt.Errorf("expected JSON path %q to contain %q, got %q", path, expected, actual)
 	}
 
 	return nil

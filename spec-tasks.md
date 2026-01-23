@@ -127,10 +127,10 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: Table output shows dash for empty fields
 
 ### Feature: JSON Output (`output_json.feature`)
-- [ ] Scenario: JSON output is valid JSON
-- [ ] Scenario: JSON output includes all task fields
-- [ ] Scenario: JSON output includes count and hasMore
-- [ ] Scenario: JSON error output format
+- [x] Scenario: JSON output is valid JSON
+- [x] Scenario: JSON output includes all task fields
+- [x] Scenario: JSON output includes count and hasMore
+- [x] Scenario: JSON error output format
 
 ### Feature: Plain Output (`output_plain.feature`)
 - [ ] Scenario: Plain output shows one task per line
@@ -380,7 +380,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 |-------|--------|---------------|-----------|
 | Phase 0: Infrastructure | Complete | 0 | 0 |
 | Phase 1: Local CRUD | In Progress | 5 | 36 |
-| Phase 1b: Output Formats | In Progress | 1 | 4 |
+| Phase 1b: Output Formats | In Progress | 2 | 8 |
 | Phase 1c: Configuration | Not Started | 0 | 0 |
 | Phase 1d: Error Handling | Not Started | 0 | 0 |
 | Phase 2: Agent Coordination | Not Started | 0 | 0 |
