@@ -10,8 +10,8 @@
 
 ### Core Types & Interfaces
 - [x] Define `Task` struct with all fields (id, title, description, status, priority, etc.)
-- [ ] Define `Backend` interface in `internal/backend/backend.go`
-- [ ] Define `TaskFilters`, `TaskInput`, `TaskChanges` types
+- [x] Define `Backend` interface in `internal/backend/backend.go`
+- [x] Define `TaskFilters`, `TaskInput`, `TaskChanges` types
 - [x] Define status enum (`backlog`, `todo`, `in-progress`, `review`, `done`)
 - [x] Define priority enum (`urgent`, `high`, `medium`, `low`, `none`)
 - [ ] Create backend registry in `internal/backend/registry.go`

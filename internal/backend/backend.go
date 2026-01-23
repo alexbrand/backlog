@@ -117,3 +117,181 @@ type TaskList struct {
 	// HasMore indicates if there are more tasks available.
 	HasMore bool `json:"hasMore"`
 }
+
+// TaskFilters specifies filtering options for listing tasks.
+type TaskFilters struct {
+	// Status filters by task status.
+	Status []Status
+
+	// Priority filters by priority level.
+	Priority []Priority
+
+	// Assignee filters by assignee (use "@me" for current user, "unassigned" for no assignee).
+	Assignee string
+
+	// Labels filters by labels (task must have all specified labels).
+	Labels []string
+
+	// Limit is the maximum number of tasks to return.
+	Limit int
+
+	// IncludeDone includes tasks with done status (excluded by default).
+	IncludeDone bool
+}
+
+// TaskInput specifies fields for creating a new task.
+type TaskInput struct {
+	// Title is the task title (required).
+	Title string
+
+	// Description is the task description (optional).
+	Description string
+
+	// Status is the initial status (defaults to backlog).
+	Status Status
+
+	// Priority is the priority level (defaults to none).
+	Priority Priority
+
+	// Labels are initial labels for the task.
+	Labels []string
+
+	// Assignee is the initial assignee (optional).
+	Assignee string
+}
+
+// TaskChanges specifies fields to update on an existing task.
+type TaskChanges struct {
+	// Title is the new title (nil means no change).
+	Title *string
+
+	// Description is the new description (nil means no change).
+	Description *string
+
+	// Priority is the new priority (nil means no change).
+	Priority *Priority
+
+	// Assignee is the new assignee (nil means no change, empty string means unassign).
+	Assignee *string
+
+	// AddLabels are labels to add.
+	AddLabels []string
+
+	// RemoveLabels are labels to remove.
+	RemoveLabels []string
+}
+
+// HealthStatus represents the health of a backend connection.
+type HealthStatus struct {
+	// OK indicates whether the backend is healthy.
+	OK bool
+
+	// Message provides additional details about the health status.
+	Message string
+
+	// Latency is the response time of the health check.
+	Latency time.Duration
+}
+
+// ClaimResult represents the result of a claim operation.
+type ClaimResult struct {
+	// Task is the claimed task.
+	Task *Task
+
+	// AlreadyOwned indicates if the task was already claimed by this agent.
+	AlreadyOwned bool
+}
+
+// SyncResult represents the result of a sync operation.
+type SyncResult struct {
+	// Created is the number of tasks created locally.
+	Created int
+
+	// Updated is the number of tasks updated locally.
+	Updated int
+
+	// Deleted is the number of tasks deleted locally.
+	Deleted int
+
+	// Pushed is the number of local changes pushed to remote.
+	Pushed int
+
+	// Conflicts is the number of conflicts encountered.
+	Conflicts int
+}
+
+// Config holds backend-specific configuration.
+type Config struct {
+	// Workspace is the workspace configuration.
+	Workspace any
+
+	// AgentID is the identifier for this agent.
+	AgentID string
+
+	// AgentLabelPrefix is the prefix for agent labels (e.g., "agent").
+	AgentLabelPrefix string
+}
+
+// Backend defines the interface that all backlog backends must implement.
+type Backend interface {
+	// Name returns the name of the backend (e.g., "github", "linear", "local").
+	Name() string
+
+	// Version returns the version of the backend implementation.
+	Version() string
+
+	// Connect initializes the backend with the given configuration.
+	Connect(cfg Config) error
+
+	// Disconnect closes the backend connection and cleans up resources.
+	Disconnect() error
+
+	// HealthCheck verifies the backend is accessible and working.
+	HealthCheck() (HealthStatus, error)
+
+	// List returns tasks matching the given filters.
+	List(filters TaskFilters) (*TaskList, error)
+
+	// Get returns a single task by ID.
+	Get(id string) (*Task, error)
+
+	// Create creates a new task and returns it.
+	Create(input TaskInput) (*Task, error)
+
+	// Update modifies an existing task and returns the updated task.
+	Update(id string, changes TaskChanges) (*Task, error)
+
+	// Delete removes a task by ID.
+	Delete(id string) error
+
+	// Move transitions a task to a new status.
+	Move(id string, status Status) (*Task, error)
+
+	// Assign assigns a task to a user.
+	Assign(id string, assignee string) (*Task, error)
+
+	// Unassign removes the assignee from a task.
+	Unassign(id string) (*Task, error)
+
+	// ListComments returns all comments for a task.
+	ListComments(id string) ([]Comment, error)
+
+	// AddComment adds a comment to a task.
+	AddComment(id string, body string) (*Comment, error)
+}
+
+// Claimer is an optional interface for backends that support agent claim/release.
+type Claimer interface {
+	// Claim claims a task for an agent. Returns ClaimResult with the task.
+	// Returns an error with exit code 2 if the task is already claimed by another agent.
+	Claim(id string, agentID string) (*ClaimResult, error)
+
+	// Release releases a claimed task back to todo status.
+	Release(id string) error
+}
+
+// Syncer is an optional interface for backends that support sync operations.
+type Syncer interface {
+	// Sync synchronizes local state with remote.
+	Sync(force bool) (*SyncResult, error)
+}
