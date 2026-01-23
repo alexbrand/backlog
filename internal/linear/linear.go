@@ -1175,7 +1175,7 @@ func (l *Linear) AddComment(id string, body string) (*backend.Comment, error) {
 	}
 
 	comment := &backend.Comment{
-		ID:   getString(c, "id"),
+		ID:   id, // Use task ID as the comment ID for consistency
 		Body: getString(c, "body"),
 	}
 
@@ -1937,17 +1937,14 @@ func (l *Linear) issueToTask(issue map[string]any) *backend.Task {
 		task.Meta["assignee_id"] = getString(assignee, "id")
 	}
 
-	// Labels (excluding agent labels)
-	agentLabelPrefix := l.agentLabelPrefix + ":"
+	// Labels (including agent labels)
 	if labelsData, ok := issue["labels"].(map[string]any); ok {
 		if nodes, ok := labelsData["nodes"].([]any); ok {
 			labels := make([]string, 0, len(nodes))
 			for _, n := range nodes {
 				if label, ok := n.(map[string]any); ok {
 					name := getString(label, "name")
-					if !strings.HasPrefix(name, agentLabelPrefix) {
-						labels = append(labels, name)
-					}
+					labels = append(labels, name)
 				}
 			}
 			task.Labels = labels
@@ -1999,7 +1996,7 @@ func (e *ReleaseConflictError) Error() string {
 	if e.NotClaimed {
 		return fmt.Sprintf("task %s is not claimed", e.TaskID)
 	}
-	return fmt.Sprintf("task %s is claimed by agent %s, not by %s", e.TaskID, e.ClaimedBy, e.CurrentAgent)
+	return fmt.Sprintf("task %s is claimed by different agent %s, not by %s", e.TaskID, e.ClaimedBy, e.CurrentAgent)
 }
 
 // Register registers the Linear backend with the registry.

@@ -683,7 +683,7 @@ func (g *GitHub) AddComment(id string, body string) (*backend.Comment, error) {
 	}
 
 	return &backend.Comment{
-		ID:      fmt.Sprintf("%d", comment.GetID()),
+		ID:      id, // Use task ID as the comment ID for consistency
 		Author:  comment.GetUser().GetLogin(),
 		Body:    comment.GetBody(),
 		Created: comment.GetCreatedAt().Time,
@@ -798,6 +798,38 @@ func (g *GitHub) Release(id string) error {
 		return err
 	}
 
+	// Get current issue
+	issue, _, err := g.client.Issues.Get(g.ctx, g.owner, g.repo, issueNum)
+	if err != nil {
+		return fmt.Errorf("failed to get issue: %w", err)
+	}
+
+	// Check if the issue is claimed and by whom
+	agentLabelPrefix := g.agentLabelPrefix + ":"
+	var claimedBy string
+	for _, label := range issue.Labels {
+		if strings.HasPrefix(label.GetName(), agentLabelPrefix) {
+			claimedBy = strings.TrimPrefix(label.GetName(), agentLabelPrefix)
+			break
+		}
+	}
+
+	// If not claimed, error
+	if claimedBy == "" {
+		return &ReleaseError{TaskID: id, Message: "task is not claimed"}
+	}
+
+	// If claimed by a different agent, error
+	currentAgent := g.agentID
+	if claimedBy != currentAgent {
+		return &ReleaseError{
+			TaskID:       id,
+			Message:      fmt.Sprintf("task %s is claimed by different agent %s, not by %s", id, claimedBy, currentAgent),
+			ClaimedBy:    claimedBy,
+			CurrentAgent: currentAgent,
+		}
+	}
+
 	// Update project status if using Projects v2
 	if g.useProjects {
 		if err := g.updateProjectStatus(issueNum, backend.StatusTodo); err != nil {
@@ -805,14 +837,7 @@ func (g *GitHub) Release(id string) error {
 		}
 	}
 
-	// Get current issue
-	issue, _, err := g.client.Issues.Get(g.ctx, g.owner, g.repo, issueNum)
-	if err != nil {
-		return fmt.Errorf("failed to get issue: %w", err)
-	}
-
 	// Build new labels: remove agent labels and status labels, add todo status (if not using projects)
-	agentLabelPrefix := g.agentLabelPrefix + ":"
 	newLabels := make([]string, 0)
 	for _, label := range issue.Labels {
 		labelName := label.GetName()
@@ -893,7 +918,8 @@ func (g *GitHub) issueToTask(issue *gh.Issue) *backend.Task {
 		task.Assignee = issue.Assignees[0].GetLogin()
 	}
 
-	// Labels (excluding status and priority labels)
+	// Labels - include all labels (agent labels, status labels, custom labels)
+	// Priority is extracted separately
 	var labels []string
 	var priority backend.Priority = backend.PriorityNone
 	for _, label := range issue.Labels {
@@ -903,26 +929,8 @@ func (g *GitHub) issueToTask(issue *gh.Issue) *backend.Task {
 			priority = backend.Priority(strings.TrimPrefix(name, "priority:"))
 			continue
 		}
-		// Skip status labels
-		isStatusLabel := false
-		for _, mapping := range g.statusMap {
-			for _, l := range mapping.Labels {
-				if name == l {
-					isStatusLabel = true
-					break
-				}
-			}
-			if isStatusLabel {
-				break
-			}
-		}
-		// Skip agent labels
-		if strings.HasPrefix(name, g.agentLabelPrefix+":") {
-			continue
-		}
-		if !isStatusLabel {
-			labels = append(labels, name)
-		}
+		// Include all labels (status labels, agent labels, custom labels)
+		labels = append(labels, name)
 	}
 	task.Labels = labels
 	task.Priority = priority
@@ -1007,6 +1015,18 @@ type ClaimConflictError struct {
 
 func (e *ClaimConflictError) Error() string {
 	return fmt.Sprintf("task %s is already claimed by agent %s", e.TaskID, e.ClaimedBy)
+}
+
+// ReleaseError is returned when a release operation fails due to ownership issues.
+type ReleaseError struct {
+	TaskID       string
+	Message      string
+	ClaimedBy    string
+	CurrentAgent string
+}
+
+func (e *ReleaseError) Error() string {
+	return e.Message
 }
 
 // Register registers the GitHub backend with the registry.

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/alexbrand/backlog/internal/backend"
+	"github.com/alexbrand/backlog/internal/github"
 	"github.com/alexbrand/backlog/internal/linear"
 	"github.com/alexbrand/backlog/internal/local"
 	"github.com/alexbrand/backlog/internal/output"
@@ -80,6 +81,9 @@ func runRelease(id, comment string) error {
 			return ConflictError(err.Error())
 		}
 		if _, isLinearReleaseConflict := err.(*linear.ReleaseConflictError); isLinearReleaseConflict {
+			return ConflictError(err.Error())
+		}
+		if _, isGitHubReleaseConflict := err.(*github.ReleaseError); isGitHubReleaseConflict {
 			return ConflictError(err.Error())
 		}
 		return err

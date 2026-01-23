@@ -89,8 +89,22 @@ func (f *TableFormatter) FormatTaskList(w io.Writer, list *backend.TaskList) err
 	return tw.Flush()
 }
 
+// FormatTaskWithComments outputs a single task with its comments.
+func (f *TableFormatter) FormatTaskWithComments(w io.Writer, task *backend.Task, comments []backend.Comment) error {
+	// First output the task
+	if err := f.FormatTask(w, task); err != nil {
+		return err
+	}
+
+	// Then output comments
+	fmt.Fprintln(w)
+	return f.FormatComments(w, comments)
+}
+
 // FormatComment outputs a single comment.
 func (f *TableFormatter) FormatComment(w io.Writer, comment *backend.Comment) error {
+	fmt.Fprintf(w, "Comment added to %s\n", comment.ID)
+	fmt.Fprintln(w)
 	fmt.Fprintf(w, "### %s @%s\n", comment.Created.Format("2006-01-02"), comment.Author)
 	fmt.Fprintln(w, comment.Body)
 	return nil

@@ -55,21 +55,21 @@ func runShow(id string) error {
 		return err
 	}
 
-	// Output the task
+	// Output the task (with comments if requested)
 	formatter := output.New(output.Format(GetFormat()))
-	if err := formatter.FormatTask(os.Stdout, task); err != nil {
-		return err
-	}
 
-	// If comments requested, fetch and display them
 	if showComments {
 		comments, err := b.ListComments(id)
 		if err != nil {
 			return fmt.Errorf("failed to list comments: %w", err)
 		}
 
-		fmt.Fprintln(os.Stdout)
-		if err := formatter.FormatComments(os.Stdout, comments); err != nil {
+		// Use combined output for task with comments
+		if err := formatter.FormatTaskWithComments(os.Stdout, task, comments); err != nil {
+			return err
+		}
+	} else {
+		if err := formatter.FormatTask(os.Stdout, task); err != nil {
 			return err
 		}
 	}

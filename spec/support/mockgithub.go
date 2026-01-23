@@ -4,6 +4,7 @@ package support
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -457,15 +458,19 @@ func (m *MockGitHubServer) updateIssue(w http.ResponseWriter, r *http.Request, n
 		return
 	}
 
+	// Read the raw body for debugging
+	bodyBytes, _ := io.ReadAll(r.Body)
+
 	var input struct {
-		Title    *string  `json:"title,omitempty"`
-		Body     *string  `json:"body,omitempty"`
-		State    *string  `json:"state,omitempty"`
-		Labels   []string `json:"labels,omitempty"`
-		Assignee *string  `json:"assignee,omitempty"`
+		Title     *string  `json:"title,omitempty"`
+		Body      *string  `json:"body,omitempty"`
+		State     *string  `json:"state,omitempty"`
+		Labels    []string `json:"labels,omitempty"`
+		Assignee  *string  `json:"assignee,omitempty"`
+		Assignees []string `json:"assignees,omitempty"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+	if err := json.Unmarshal(bodyBytes, &input); err != nil {
 		m.writeError(w, http.StatusBadRequest, "Invalid JSON", err.Error())
 		return
 	}
@@ -479,11 +484,19 @@ func (m *MockGitHubServer) updateIssue(w http.ResponseWriter, r *http.Request, n
 	if input.State != nil {
 		issue.State = *input.State
 	}
-	if input.Labels != nil {
+	// Always update labels if provided in request (even if empty)
+	if len(input.Labels) > 0 {
 		issue.Labels = input.Labels
 	}
 	if input.Assignee != nil {
 		issue.Assignee = *input.Assignee
+	}
+	// Handle Assignees array (takes precedence over singular Assignee)
+	if len(input.Assignees) > 0 {
+		issue.Assignee = input.Assignees[0]
+	} else if input.Assignees != nil && len(input.Assignees) == 0 {
+		// Empty assignees array means unassign
+		issue.Assignee = ""
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -734,20 +747,24 @@ func (m *MockGitHubServer) issueToJSON(issue *MockGitHubIssue) map[string]interf
 
 	// Add labels array
 	var labels []map[string]interface{}
-	for _, label := range issue.Labels {
+	for i, label := range issue.Labels {
 		labels = append(labels, map[string]interface{}{
+			"id":   int64(i + 1),
 			"name": label,
 		})
 	}
 	result["labels"] = labels
 
-	// Add assignee if set
+	// Add assignee if set (both singular and plural for go-github compatibility)
 	if issue.Assignee != "" {
-		result["assignee"] = map[string]interface{}{
+		assigneeObj := map[string]interface{}{
 			"login": issue.Assignee,
 		}
+		result["assignee"] = assigneeObj
+		result["assignees"] = []map[string]interface{}{assigneeObj}
 	} else {
 		result["assignee"] = nil
+		result["assignees"] = []map[string]interface{}{}
 	}
 
 	return result

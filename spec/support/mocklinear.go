@@ -157,7 +157,7 @@ func (m *MockLinearServer) validateAuth(w http.ResponseWriter, r *http.Request) 
 	// If auth error is enabled, check for "invalid" keys
 	if authErrorEnabled {
 		if auth == "" || auth == "invalid_key" || auth == "Bearer invalid_key" {
-			m.writeGraphQLError(w, "Authentication required", "AUTHENTICATION_ERROR")
+			m.writeGraphQLError(w, "authentication required", "AUTHENTICATION_ERROR")
 			return false
 		}
 	}
@@ -253,8 +253,8 @@ func (m *MockLinearServer) handleIssuesQuery(w http.ResponseWriter, variables ma
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	// Build issues list
-	var issueNodes []map[string]interface{}
+	// Build issues list - use empty slice not nil to serialize as [] not null
+	issueNodes := make([]map[string]interface{}, 0)
 	for _, issue := range m.Issues {
 		// Apply team filter if specified
 		if teamKey, ok := variables["teamKey"].(string); ok && teamKey != "" {
@@ -380,6 +380,9 @@ func (m *MockLinearServer) handleUpdateIssue(w http.ResponseWriter, variables ma
 	}
 	if assigneeID, ok := input["assigneeId"].(string); ok {
 		issue.Assignee = assigneeID
+	} else if _, hasKey := input["assigneeId"]; hasKey {
+		// If assigneeId key exists but is not a string (i.e., null), clear assignee
+		issue.Assignee = ""
 	}
 
 	// Handle labelIds - replaces all labels
@@ -576,9 +579,14 @@ func (m *MockLinearServer) issueToGraphQL(issue *MockLinearIssue) map[string]int
 
 	// Add assignee if set
 	if issue.Assignee != "" {
+		assigneeName := issue.Assignee
+		// If assignee is the authenticated user's ID, use their name
+		if issue.Assignee == "user-id-123" && m.AuthenticatedUser != "" {
+			assigneeName = m.AuthenticatedUser
+		}
 		result["assignee"] = map[string]interface{}{
 			"id":   issue.Assignee,
-			"name": issue.Assignee,
+			"name": assigneeName,
 		}
 	} else {
 		result["assignee"] = nil

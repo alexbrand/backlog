@@ -21,6 +21,26 @@ func (f *JSONFormatter) FormatTaskList(w io.Writer, list *backend.TaskList) erro
 	return f.writeJSON(w, list)
 }
 
+// FormatTaskWithComments outputs a single task with its comments as JSON.
+func (f *JSONFormatter) FormatTaskWithComments(w io.Writer, task *backend.Task, comments []backend.Comment) error {
+	// Create a combined structure that embeds the task and adds comments
+	result := map[string]any{
+		"id":          task.ID,
+		"title":       task.Title,
+		"description": task.Description,
+		"status":      task.Status,
+		"priority":    task.Priority,
+		"assignee":    task.Assignee,
+		"created":     task.Created,
+		"updated":     task.Updated,
+		"url":         task.URL,
+		"labels":      task.Labels,
+		"meta":        task.Meta,
+		"comments":    comments,
+	}
+	return f.writeJSON(w, result)
+}
+
 // FormatComment outputs a single comment as JSON.
 func (f *JSONFormatter) FormatComment(w io.Writer, comment *backend.Comment) error {
 	return f.writeJSON(w, comment)
@@ -77,6 +97,8 @@ func (f *JSONFormatter) FormatClaimed(w io.Writer, task *backend.Task, agentID s
 		"agent":        agentID,
 		"alreadyOwned": alreadyOwned,
 		"url":          task.URL,
+		"labels":       task.Labels,
+		"assignee":     task.Assignee,
 	})
 }
 
@@ -88,6 +110,7 @@ func (f *JSONFormatter) FormatReleased(w io.Writer, task *backend.Task) error {
 		"status":   task.Status,
 		"url":      task.URL,
 		"assignee": task.Assignee,
+		"labels":   task.Labels,
 	})
 }
 

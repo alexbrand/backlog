@@ -72,8 +72,9 @@ func runComment(id string, message string) error {
 	// Add the comment
 	comment, err := b.AddComment(id, message)
 	if err != nil {
-		// Check for not found error
-		if strings.Contains(err.Error(), "not found") {
+		// Check for not found error (case-insensitive)
+		errLower := strings.ToLower(err.Error())
+		if strings.Contains(errLower, "not found") || strings.Contains(errLower, "404") {
 			return NotFoundError(err.Error())
 		}
 		return err

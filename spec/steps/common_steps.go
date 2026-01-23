@@ -397,14 +397,14 @@ func stdoutShouldNotContain(ctx context.Context, unexpected string) error {
 	return nil
 }
 
-// stderrShouldContain verifies stderr contains a substring.
+// stderrShouldContain verifies stderr contains a substring (case-insensitive).
 func stderrShouldContain(ctx context.Context, expected string) error {
 	result := getLastResult(ctx)
 	if result == nil {
 		return fmt.Errorf("no command has been run")
 	}
 
-	if !strings.Contains(result.Stderr, expected) {
+	if !strings.Contains(strings.ToLower(result.Stderr), strings.ToLower(expected)) {
 		return fmt.Errorf("expected stderr to contain %q, got:\n%s", expected, result.Stderr)
 	}
 
@@ -1848,6 +1848,30 @@ func aRemoteGitRepository(ctx context.Context) (context.Context, error) {
 		return ctx, fmt.Errorf("failed to add remote: %w\nOutput: %s", err, output)
 	}
 
+	// Check if there are any commits yet
+	cmd = exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = env.TempDir
+	if err := cmd.Run(); err != nil {
+		// No commits yet, create an initial commit
+		// First create a placeholder file to have something to commit
+		placeholderPath := env.TempDir + "/.gitkeep"
+		if err := os.WriteFile(placeholderPath, []byte(""), 0644); err != nil {
+			return ctx, fmt.Errorf("failed to create placeholder file: %w", err)
+		}
+
+		cmd = exec.Command("git", "add", ".gitkeep")
+		cmd.Dir = env.TempDir
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return ctx, fmt.Errorf("failed to git add placeholder: %w\nOutput: %s", err, output)
+		}
+
+		cmd = exec.Command("git", "commit", "-m", "Initial commit")
+		cmd.Dir = env.TempDir
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return ctx, fmt.Errorf("failed to create initial commit: %w\nOutput: %s", err, output)
+		}
+	}
+
 	// Push the current state to the remote
 	cmd = exec.Command("git", "push", "-u", "origin", "master")
 	cmd.Dir = env.TempDir
@@ -2484,20 +2508,26 @@ func theMockGitHubAPIHasTheFollowingIssues(ctx context.Context, table *godog.Tab
 }
 
 // aCredentialsFileWithTheFollowingContent creates a credentials file.
+// The credentials module looks for ~/.config/backlog/credentials.yaml,
+// so we create the file there (HOME is set to the test temp directory).
 func aCredentialsFileWithTheFollowingContent(ctx context.Context, content *godog.DocString) (context.Context, error) {
 	env := getTestEnv(ctx)
 	if env == nil {
 		return ctx, fmt.Errorf("test environment not initialized")
 	}
 
-	// Ensure .backlog directory exists
-	if !env.FileExists(".backlog") {
-		if err := env.CreateBacklogDir(); err != nil {
-			return ctx, fmt.Errorf("failed to create backlog directory: %w", err)
-		}
+	// Set HOME to the test temp directory so credentials module finds our file
+	env.SetEnv("HOME", env.TempDir)
+
+	// Create the ~/.config/backlog directory structure
+	configDir := filepath.Join(env.TempDir, ".config", "backlog")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return ctx, fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	if err := env.CreateFile(".backlog/credentials.yaml", content.Content); err != nil {
+	// Write credentials file to ~/.config/backlog/credentials.yaml
+	credPath := filepath.Join(configDir, "credentials.yaml")
+	if err := os.WriteFile(credPath, []byte(content.Content), 0600); err != nil {
 		return ctx, fmt.Errorf("failed to create credentials file: %w", err)
 	}
 

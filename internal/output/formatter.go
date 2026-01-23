@@ -41,6 +41,9 @@ type Formatter interface {
 	// FormatTaskList outputs a list of tasks.
 	FormatTaskList(w io.Writer, list *backend.TaskList) error
 
+	// FormatTaskWithComments outputs a single task with its comments.
+	FormatTaskWithComments(w io.Writer, task *backend.Task, comments []backend.Comment) error
+
 	// FormatComment outputs a single comment.
 	FormatComment(w io.Writer, comment *backend.Comment) error
 

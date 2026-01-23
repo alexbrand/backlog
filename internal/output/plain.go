@@ -57,6 +57,15 @@ func (f *PlainFormatter) FormatTaskList(w io.Writer, list *backend.TaskList) err
 	return nil
 }
 
+// FormatTaskWithComments outputs a single task with its comments in plain format.
+func (f *PlainFormatter) FormatTaskWithComments(w io.Writer, task *backend.Task, comments []backend.Comment) error {
+	if err := f.FormatTask(w, task); err != nil {
+		return err
+	}
+	fmt.Fprintln(w)
+	return f.FormatComments(w, comments)
+}
+
 // FormatComment outputs a single comment in plain format.
 func (f *PlainFormatter) FormatComment(w io.Writer, comment *backend.Comment) error {
 	fmt.Fprintf(w, "%s\t%s\t%s\n", comment.ID, comment.Author, comment.Body)

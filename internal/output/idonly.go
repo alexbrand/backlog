@@ -25,6 +25,12 @@ func (f *IDOnlyFormatter) FormatTaskList(w io.Writer, list *backend.TaskList) er
 	return nil
 }
 
+// FormatTaskWithComments outputs only the task ID (comments are ignored).
+func (f *IDOnlyFormatter) FormatTaskWithComments(w io.Writer, task *backend.Task, _ []backend.Comment) error {
+	fmt.Fprintln(w, task.ID)
+	return nil
+}
+
 // FormatComment outputs only the comment ID.
 func (f *IDOnlyFormatter) FormatComment(w io.Writer, comment *backend.Comment) error {
 	fmt.Fprintln(w, comment.ID)

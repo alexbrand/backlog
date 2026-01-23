@@ -504,10 +504,9 @@ func (l *Local) AddComment(id string, body string) (*backend.Comment, error) {
 		comments = existing
 	}
 
-	// Generate comment ID
-	commentID := fmt.Sprintf("%s-c%d", id, len(comments)+1)
+	// Use task ID as the comment ID for consistency with other backends
 	comment := backend.Comment{
-		ID:      commentID,
+		ID:      id,
 		Author:  l.agentID,
 		Body:    body,
 		Created: time.Now().UTC(),
@@ -1133,8 +1132,18 @@ func (l *Local) gitCommit(action, taskID string) error {
 
 // gitPull pulls changes from the remote repository.
 // Returns an error if pull fails or has conflicts.
+// If there's no remote configured or no tracking branch, it's a no-op.
 func (l *Local) gitPull() error {
 	gitDir := filepath.Dir(l.path)
+
+	// Check if there's a remote configured first
+	remoteCmd := exec.Command("git", "remote")
+	remoteCmd.Dir = gitDir
+	remoteOutput, err := remoteCmd.Output()
+	if err != nil || strings.TrimSpace(string(remoteOutput)) == "" {
+		// No remote configured, nothing to pull
+		return nil
+	}
 
 	pullCmd := exec.Command("git", "pull")
 	pullCmd.Dir = gitDir
@@ -1148,6 +1157,11 @@ func (l *Local) gitPull() error {
 				Message:   outputStr,
 			}
 		}
+		// Check if there's no tracking branch (not an error - just means no remote configured)
+		if strings.Contains(outputStr, "no tracking information") ||
+			strings.Contains(outputStr, "There is no tracking information") {
+			return nil
+		}
 		// Check if it's just "already up to date"
 		if !strings.Contains(outputStr, "Already up to date") &&
 			!strings.Contains(outputStr, "Already up-to-date") {
@@ -1159,8 +1173,18 @@ func (l *Local) gitPull() error {
 
 // gitPush pushes changes to the remote repository.
 // Returns a ClaimConflictError if push is rejected (for use with git-based claims).
+// If there's no remote configured, it's a no-op.
 func (l *Local) gitPush() error {
 	gitDir := filepath.Dir(l.path)
+
+	// Check if there's a remote configured first
+	remoteCmd := exec.Command("git", "remote")
+	remoteCmd.Dir = gitDir
+	remoteOutput, err := remoteCmd.Output()
+	if err != nil || strings.TrimSpace(string(remoteOutput)) == "" {
+		// No remote configured, nothing to push
+		return nil
+	}
 
 	pushCmd := exec.Command("git", "push")
 	pushCmd.Dir = gitDir
