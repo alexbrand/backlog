@@ -42,6 +42,15 @@ func (f *JSONFormatter) FormatCreated(w io.Writer, task *backend.Task) error {
 	})
 }
 
+// FormatMoved outputs the result of moving a task as JSON.
+func (f *JSONFormatter) FormatMoved(w io.Writer, task *backend.Task, oldStatus, newStatus backend.Status) error {
+	return f.writeJSON(w, map[string]any{
+		"id":     task.ID,
+		"title":  task.Title,
+		"status": newStatus,
+	})
+}
+
 // FormatError outputs an error as JSON.
 func (f *JSONFormatter) FormatError(w io.Writer, code string, message string, details map[string]any) error {
 	errObj := map[string]any{

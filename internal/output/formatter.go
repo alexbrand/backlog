@@ -49,6 +49,9 @@ type Formatter interface {
 	// FormatCreated outputs the result of creating a task.
 	FormatCreated(w io.Writer, task *backend.Task) error
 
+	// FormatMoved outputs the result of moving a task to a new status.
+	FormatMoved(w io.Writer, task *backend.Task, oldStatus, newStatus backend.Status) error
+
 	// FormatError outputs an error.
 	FormatError(w io.Writer, code string, message string, details map[string]any) error
 }

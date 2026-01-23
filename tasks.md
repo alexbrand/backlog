@@ -41,7 +41,7 @@
 - [x] Implement `backlog add <title>` with flags (`--priority`, `--label`, `--description`, `--body-file`, `--status`)
 - [x] Implement `backlog list` with filters (`--status`, `--assignee`, `--priority`, `--label`, `--limit`)
 - [x] Implement `backlog show <id>` with `--comments` flag
-- [ ] Implement `backlog move <id> <status>`
+- [x] Implement `backlog move <id> <status>`
 - [ ] Implement `backlog edit <id>` with flags (`--title`, `--priority`, `--add-label`, `--remove-label`, `--description`)
 
 ### Global Flags

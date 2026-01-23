@@ -48,6 +48,12 @@ func (f *PlainFormatter) FormatCreated(w io.Writer, task *backend.Task) error {
 	return nil
 }
 
+// FormatMoved outputs the result of moving a task in plain format.
+func (f *PlainFormatter) FormatMoved(w io.Writer, task *backend.Task, oldStatus, newStatus backend.Status) error {
+	fmt.Fprintf(w, "%s\t%s\t%s\n", task.ID, oldStatus, newStatus)
+	return nil
+}
+
 // FormatError outputs an error in plain format.
 func (f *PlainFormatter) FormatError(w io.Writer, code string, message string, details map[string]any) error {
 	fmt.Fprintf(w, "error: %s\n", message)

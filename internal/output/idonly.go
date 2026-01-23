@@ -44,6 +44,12 @@ func (f *IDOnlyFormatter) FormatCreated(w io.Writer, task *backend.Task) error {
 	return nil
 }
 
+// FormatMoved outputs only the moved task ID.
+func (f *IDOnlyFormatter) FormatMoved(w io.Writer, task *backend.Task, _, _ backend.Status) error {
+	fmt.Fprintln(w, task.ID)
+	return nil
+}
+
 // FormatError outputs an error message (errors are always shown).
 func (f *IDOnlyFormatter) FormatError(w io.Writer, code string, message string, details map[string]any) error {
 	fmt.Fprintf(w, "error: %s\n", message)
