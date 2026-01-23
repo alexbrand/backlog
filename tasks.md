@@ -197,7 +197,7 @@
 ## Cross-Cutting Concerns
 
 ### Testing
-- [ ] Unit tests for task file parsing
+- [x] Unit tests for task file parsing
 - [ ] Unit tests for each backend
 - [ ] Integration tests for CLI commands
 - [ ] Test multi-agent claim scenarios
