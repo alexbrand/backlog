@@ -157,7 +157,7 @@
 
 ### GitHub Projects v2 Integration
 - [x] Implement GraphQL API client for Projects
-- [ ] Implement project field discovery
+- [x] Implement project field discovery
 - [ ] Implement column-based status (instead of labels)
 - [ ] Add `project` config option (project number)
 - [ ] Add `status_field` config option

@@ -882,7 +882,7 @@ func (m *MockGitHubServer) handleProjectFieldsQuery(w http.ResponseWriter, proje
 		return
 	}
 
-	// Build field options from columns
+	// Build field options from columns (for the Status field)
 	var options []map[string]interface{}
 	for _, col := range project.Columns {
 		options = append(options, map[string]interface{}{
@@ -891,20 +891,31 @@ func (m *MockGitHubServer) handleProjectFieldsQuery(w http.ResponseWriter, proje
 		})
 	}
 
+	// Build the fields array with Status as a single-select field
+	// and include built-in fields like Title
+	fieldNodes := []map[string]interface{}{
+		{
+			// Title field (regular ProjectV2Field)
+			"__typename": "ProjectV2Field",
+			"id":         "PVTF_Title",
+			"name":       "Title",
+			"dataType":   "TITLE",
+		},
+		{
+			// Status field (single-select)
+			"__typename": "ProjectV2SingleSelectField",
+			"id":         "PVTSSF_Status",
+			"name":       "Status",
+			"options":    options,
+		},
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"data": map[string]interface{}{
-			"repository": map[string]interface{}{
-				"projectV2": map[string]interface{}{
-					"id":     fmt.Sprintf("PVT_%d", project.ID),
-					"title":  project.Title,
-					"number": project.ID,
-					"field": map[string]interface{}{
-						"__typename": "ProjectV2SingleSelectField",
-						"id":         "PVTSSF_Status",
-						"name":       "Status",
-						"options":    options,
-					},
+			"node": map[string]interface{}{
+				"fields": map[string]interface{}{
+					"nodes": fieldNodes,
 				},
 			},
 		},

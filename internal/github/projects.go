@@ -471,6 +471,93 @@ func (p *ProjectsClient) MapStatusToOptionID(status backend.Status, statusField 
 	return "", fmt.Errorf("no project column found for status %q (available: %v)", status, optNames)
 }
 
+// DiscoverFields returns all available fields in the project.
+// This is useful for discovering what fields are available for configuration.
+func (p *ProjectsClient) DiscoverFields() ([]ProjectField, error) {
+	projectID, err := p.GetProjectID()
+	if err != nil {
+		return nil, err
+	}
+
+	// Query for all project fields
+	var query struct {
+		Node struct {
+			ProjectV2 struct {
+				Fields struct {
+					Nodes []struct {
+						ProjectV2Field struct {
+							ID       githubv4.ID
+							Name     githubv4.String
+							DataType githubv4.String
+						} `graphql:"... on ProjectV2Field"`
+						ProjectV2SingleSelectField struct {
+							ID      githubv4.ID
+							Name    githubv4.String
+							Options []struct {
+								ID   githubv4.ID
+								Name githubv4.String
+							}
+						} `graphql:"... on ProjectV2SingleSelectField"`
+						ProjectV2IterationField struct {
+							ID   githubv4.ID
+							Name githubv4.String
+						} `graphql:"... on ProjectV2IterationField"`
+					}
+				} `graphql:"fields(first: 50)"`
+			} `graphql:"... on ProjectV2"`
+		} `graphql:"node(id: $projectId)"`
+	}
+
+	variables := map[string]any{
+		"projectId": githubv4.ID(projectID),
+	}
+
+	if err := p.client.Query(p.ctx, &query, variables); err != nil {
+		return nil, fmt.Errorf("failed to discover project fields: %w", err)
+	}
+
+	var fields []ProjectField
+	for _, field := range query.Node.ProjectV2.Fields.Nodes {
+		// Check single-select fields first (most common for status)
+		if field.ProjectV2SingleSelectField.ID != nil {
+			pf := ProjectField{
+				ID:      string(field.ProjectV2SingleSelectField.ID.(string)),
+				Name:    string(field.ProjectV2SingleSelectField.Name),
+				Options: make([]ProjectFieldValue, len(field.ProjectV2SingleSelectField.Options)),
+			}
+			for i, opt := range field.ProjectV2SingleSelectField.Options {
+				pf.Options[i] = ProjectFieldValue{
+					ID:   string(opt.ID.(string)),
+					Name: string(opt.Name),
+				}
+			}
+			fields = append(fields, pf)
+			continue
+		}
+
+		// Check iteration fields
+		if field.ProjectV2IterationField.ID != nil {
+			pf := ProjectField{
+				ID:   string(field.ProjectV2IterationField.ID.(string)),
+				Name: string(field.ProjectV2IterationField.Name),
+			}
+			fields = append(fields, pf)
+			continue
+		}
+
+		// Check regular fields (text, number, date)
+		if field.ProjectV2Field.ID != nil {
+			pf := ProjectField{
+				ID:   string(field.ProjectV2Field.ID.(string)),
+				Name: string(field.ProjectV2Field.Name),
+			}
+			fields = append(fields, pf)
+		}
+	}
+
+	return fields, nil
+}
+
 // MapOptionToStatus maps a project field option name to a canonical backend status.
 func (p *ProjectsClient) MapOptionToStatus(optionName string) backend.Status {
 	// Map from typical project column names to canonical status
