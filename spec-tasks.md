@@ -68,7 +68,7 @@ This plan covers implementing a Gherkin-based executable specification using [go
 - [x] Scenario: List with status filter
 - [x] Scenario: List with multiple status values
 - [x] Scenario: List with priority filter
-- [ ] Scenario: List with label filter
+- [x] Scenario: List with label filter
 - [ ] Scenario: List with assignee filter
 - [ ] Scenario: List unassigned tasks
 - [ ] Scenario: List with limit

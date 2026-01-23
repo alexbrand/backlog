@@ -148,3 +148,19 @@ Feature: Listing Tasks
     And stdout should not contain "Third task"
     And stdout should not contain "Fourth task"
     And stdout should not contain "Fifth task"
+
+  Scenario: List with label filter
+    Given a backlog with the following tasks:
+      | id    | title           | status      | priority | labels        |
+      | task1 | Bug fix         | todo        | high     | bug           |
+      | task2 | New feature     | in-progress | medium   | feature       |
+      | task3 | Critical bug    | backlog     | urgent   | bug,critical  |
+      | task4 | Documentation   | todo        | low      | docs          |
+      | task5 | API feature     | review      | medium   | feature,api   |
+    When I run "backlog list --label=bug"
+    Then the exit code should be 0
+    And stdout should contain "Bug fix"
+    And stdout should contain "Critical bug"
+    And stdout should not contain "New feature"
+    And stdout should not contain "Documentation"
+    And stdout should not contain "API feature"
