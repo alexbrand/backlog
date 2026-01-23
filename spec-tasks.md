@@ -48,16 +48,16 @@ This plan covers implementing a Gherkin-based executable specification using [go
 - [x] Scenario: Initialize creates config.yaml
 
 ### Feature: Adding Tasks (`add.feature`)
-- [ ] Scenario: Add task with title only
-- [ ] Scenario: Add task with priority flag
-- [ ] Scenario: Add task with multiple labels
-- [ ] Scenario: Add task with description flag
-- [ ] Scenario: Add task with body-file flag
-- [ ] Scenario: Add task with explicit status
-- [ ] Scenario: Add task generates unique ID
-- [ ] Scenario: Add task outputs created task ID
-- [ ] Scenario: Add task with JSON output format
-- [ ] Scenario Outline: Add task with each priority level
+- [x] Scenario: Add task with title only
+- [x] Scenario: Add task with priority flag
+- [x] Scenario: Add task with multiple labels
+- [x] Scenario: Add task with description flag
+- [x] Scenario: Add task with body-file flag
+- [x] Scenario: Add task with explicit status
+- [x] Scenario: Add task generates unique ID
+- [x] Scenario: Add task outputs created task ID
+- [x] Scenario: Add task with JSON output format
+- [x] Scenario Outline: Add task with each priority level
 
 ### Feature: Listing Tasks (`list.feature`)
 - [ ] Scenario: List all tasks (excludes done by default)
@@ -104,12 +104,14 @@ This plan covers implementing a Gherkin-based executable specification using [go
 - [ ] Implement "Given a task {string} exists with status {string}"
 - [ ] Implement "Given a task {string} exists with priority {string}"
 - [ ] Implement "Given a task {string} exists with labels {string}"
-- [ ] Implement "Then a task file should exist in {string} directory"
+- [x] Implement "Then a task file should exist in {string} directory"
 - [ ] Implement "Then the task {string} should have status {string}"
-- [ ] Implement "Then the task {string} should have priority {string}"
-- [ ] Implement "Then the task {string} should have label {string}"
+- [x] Implement "Then the created task should have priority {string}"
+- [x] Implement "Then the created task should have label {string}"
 - [ ] Implement "Then the task {string} should not have label {string}"
-- [ ] Implement "Then the task count should be {int}"
+- [x] Implement "Then the task count should be {int}"
+- [x] Implement "Then stdout should match pattern {string}"
+- [x] Implement "Then the created task should have description containing {string}"
 
 ---
 
@@ -374,7 +376,7 @@ This plan covers implementing a Gherkin-based executable specification using [go
 | Phase | Status | Feature Files | Scenarios |
 |-------|--------|---------------|-----------|
 | Phase 0: Infrastructure | Complete | 0 | 0 |
-| Phase 1: Local CRUD | In Progress | 1 | 5 |
+| Phase 1: Local CRUD | In Progress | 2 | 15 |
 | Phase 1b: Output Formats | Not Started | 0 | 0 |
 | Phase 1c: Configuration | Not Started | 0 | 0 |
 | Phase 1d: Error Handling | Not Started | 0 | 0 |

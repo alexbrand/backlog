@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/cucumber/godog"
@@ -95,6 +96,12 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the JSON output should have "([^"]*)" equal to "([^"]*)"$`, theJSONOutputShouldHaveEqualTo)
 	ctx.Step(`^the directory "([^"]*)" should exist$`, theDirectoryShouldExist)
 	ctx.Step(`^the file "([^"]*)" should exist$`, theFileShouldExist)
+	ctx.Step(`^a task file should exist in "([^"]*)" directory$`, aTaskFileShouldExistInDirectory)
+	ctx.Step(`^the created task should have priority "([^"]*)"$`, theCreatedTaskShouldHavePriority)
+	ctx.Step(`^the created task should have label "([^"]*)"$`, theCreatedTaskShouldHaveLabel)
+	ctx.Step(`^the created task should have description containing "([^"]*)"$`, theCreatedTaskShouldHaveDescriptionContaining)
+	ctx.Step(`^the task count should be (\d+)$`, theTaskCountShouldBe)
+	ctx.Step(`^stdout should match pattern "([^"]*)"$`, stdoutShouldMatchPattern)
 }
 
 // aFreshBacklogDirectory creates a new empty .backlog directory.
@@ -367,6 +374,119 @@ func theFileShouldExist(ctx context.Context, path string) error {
 
 	if info.IsDir() {
 		return fmt.Errorf("path %q exists but is a directory, not a file", path)
+	}
+
+	return nil
+}
+
+// aTaskFileShouldExistInDirectory verifies that at least one task file exists in the specified status directory.
+func aTaskFileShouldExistInDirectory(ctx context.Context, status string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	reader := support.NewTaskFileReader(env.Path(".backlog"))
+	tasks := reader.ListTasksByStatus(status)
+
+	if len(tasks) == 0 {
+		return fmt.Errorf("no task files found in %q directory", status)
+	}
+
+	return nil
+}
+
+// getCreatedTask returns the most recently created task (assumes only one or uses the last in list).
+func getCreatedTask(ctx context.Context) (*support.TaskFile, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return nil, fmt.Errorf("test environment not initialized")
+	}
+
+	reader := support.NewTaskFileReader(env.Path(".backlog"))
+	tasks := reader.ListTasks()
+
+	if len(tasks) == 0 {
+		return nil, fmt.Errorf("no tasks found")
+	}
+
+	// Return the last task (most recently created in simple cases)
+	return tasks[len(tasks)-1], nil
+}
+
+// theCreatedTaskShouldHavePriority verifies the created task has the expected priority.
+func theCreatedTaskShouldHavePriority(ctx context.Context, expected string) error {
+	task, err := getCreatedTask(ctx)
+	if err != nil {
+		return err
+	}
+
+	if task.Priority != expected {
+		return fmt.Errorf("expected task priority to be %q, got %q", expected, task.Priority)
+	}
+
+	return nil
+}
+
+// theCreatedTaskShouldHaveLabel verifies the created task has a specific label.
+func theCreatedTaskShouldHaveLabel(ctx context.Context, label string) error {
+	task, err := getCreatedTask(ctx)
+	if err != nil {
+		return err
+	}
+
+	if !task.HasLabel(label) {
+		return fmt.Errorf("expected task to have label %q, but it has labels: %v", label, task.Labels)
+	}
+
+	return nil
+}
+
+// theCreatedTaskShouldHaveDescriptionContaining verifies the task description contains expected text.
+func theCreatedTaskShouldHaveDescriptionContaining(ctx context.Context, expected string) error {
+	task, err := getCreatedTask(ctx)
+	if err != nil {
+		return err
+	}
+
+	if !strings.Contains(task.Description, expected) {
+		return fmt.Errorf("expected task description to contain %q, got:\n%s", expected, task.Description)
+	}
+
+	return nil
+}
+
+// theTaskCountShouldBe verifies the total number of tasks.
+func theTaskCountShouldBe(ctx context.Context, expected int) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	reader := support.NewTaskFileReader(env.Path(".backlog"))
+	tasks := reader.ListTasks()
+
+	if len(tasks) != expected {
+		return fmt.Errorf("expected %d tasks, got %d", expected, len(tasks))
+	}
+
+	return nil
+}
+
+// stdoutShouldMatchPattern verifies stdout matches a regular expression pattern.
+func stdoutShouldMatchPattern(ctx context.Context, pattern string) error {
+	result := getLastResult(ctx)
+	if result == nil {
+		return fmt.Errorf("no command has been run")
+	}
+
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return fmt.Errorf("invalid pattern %q: %w", pattern, err)
+	}
+
+	if !re.MatchString(result.Stdout) {
+		return fmt.Errorf("expected stdout to match pattern %q, got:\n%s", pattern, result.Stdout)
 	}
 
 	return nil
