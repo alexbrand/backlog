@@ -199,7 +199,7 @@
 ### Testing
 - [x] Unit tests for task file parsing
 - [x] Unit tests for Linear backend
-- [ ] Unit tests for GitHub backend
+- [x] Unit tests for GitHub backend
 - [ ] Integration tests for CLI commands
 - [ ] Test multi-agent claim scenarios
 
