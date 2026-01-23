@@ -9,11 +9,11 @@
 - [x] Set up Viper for configuration
 
 ### Core Types & Interfaces
-- [ ] Define `Task` struct with all fields (id, title, description, status, priority, etc.)
+- [x] Define `Task` struct with all fields (id, title, description, status, priority, etc.)
 - [ ] Define `Backend` interface in `internal/backend/backend.go`
 - [ ] Define `TaskFilters`, `TaskInput`, `TaskChanges` types
-- [ ] Define status enum (`backlog`, `todo`, `in-progress`, `review`, `done`)
-- [ ] Define priority enum (`urgent`, `high`, `medium`, `low`, `none`)
+- [x] Define status enum (`backlog`, `todo`, `in-progress`, `review`, `done`)
+- [x] Define priority enum (`urgent`, `high`, `medium`, `low`, `none`)
 - [ ] Create backend registry in `internal/backend/registry.go`
 
 ### Output Formatters
@@ -216,7 +216,7 @@
 
 | Phase | Status | Tasks |
 |-------|--------|-------|
-| Phase 1: Local CRUD | In Progress | 7/X |
+| Phase 1: Local CRUD | In Progress | 10/X |
 | Phase 2: Agent Coordination | Not Started | 0/X |
 | Phase 3: Git Sync | Not Started | 0/X |
 | Phase 4: GitHub Issues | Not Started | 0/X |
