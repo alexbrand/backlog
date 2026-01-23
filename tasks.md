@@ -99,10 +99,10 @@
 ## Phase 3: Local Backend — Git Sync
 
 ### Git Integration
-- [ ] Add `lock_mode: git` config option
-- [ ] Add `git_sync: true` config option
-- [ ] Implement auto-commit on mutations (add, edit, move, claim, release)
-- [ ] Implement commit message format (`action: id-title [agent:id]`)
+- [x] Add `lock_mode: git` config option
+- [x] Add `git_sync: true` config option
+- [x] Implement auto-commit on mutations (add, edit, move, claim, release, comment)
+- [x] Implement commit message format (`action: id-title [agent:id]`)
 
 ### Sync Command
 - [ ] Implement `backlog sync` — pull, push

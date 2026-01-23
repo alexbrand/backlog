@@ -68,6 +68,7 @@ func runShow(id string) error {
 			backendCfg.Workspace = &local.WorkspaceConfig{
 				Path:     path,
 				LockMode: local.LockMode(ws.LockMode),
+				GitSync:  ws.GitSync,
 			}
 		default:
 			return fmt.Errorf("unsupported backend: %s", ws.Backend)

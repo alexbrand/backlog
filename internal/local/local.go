@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -40,6 +41,8 @@ type WorkspaceConfig struct {
 	Path string
 	// LockMode specifies the locking strategy: "file" (default) or "git".
 	LockMode LockMode
+	// GitSync enables automatic git commits after mutations.
+	GitSync bool
 }
 
 // Local implements the Backend interface using the local filesystem.
@@ -48,6 +51,7 @@ type Local struct {
 	agentID          string
 	agentLabelPrefix string
 	lockMode         LockMode
+	gitSync          bool
 	connected        bool
 }
 
@@ -73,7 +77,12 @@ func (l *Local) Connect(cfg backend.Config) error {
 		return errors.New("invalid workspace configuration for local backend")
 	}
 
-	l.path = wsCfg.Path
+	// Resolve to absolute path for consistent git operations
+	absPath, err := filepath.Abs(wsCfg.Path)
+	if err != nil {
+		return fmt.Errorf("failed to resolve absolute path: %w", err)
+	}
+	l.path = absPath
 	l.agentID = cfg.AgentID
 	l.agentLabelPrefix = cfg.AgentLabelPrefix
 	if l.agentLabelPrefix == "" {
@@ -85,6 +94,9 @@ func (l *Local) Connect(cfg backend.Config) error {
 	if l.lockMode == "" {
 		l.lockMode = LockModeFile
 	}
+
+	// Set git sync
+	l.gitSync = wsCfg.GitSync
 
 	// Verify the .backlog directory exists
 	if _, err := os.Stat(l.path); os.IsNotExist(err) {
@@ -258,11 +270,33 @@ func (l *Local) Create(input backend.TaskInput) (*backend.Task, error) {
 		return nil, fmt.Errorf("failed to write task: %w", err)
 	}
 
+	// Git commit if enabled
+	if err := l.gitCommit("add", id); err != nil {
+		return nil, fmt.Errorf("failed to commit: %w", err)
+	}
+
 	return task, nil
 }
 
 // Update modifies an existing task and returns the updated task.
+// This is the public method that commits changes to git if enabled.
 func (l *Local) Update(id string, changes backend.TaskChanges) (*backend.Task, error) {
+	task, err := l.updateInternal(id, changes)
+	if err != nil {
+		return nil, err
+	}
+
+	// Git commit if enabled
+	if err := l.gitCommit("edit", id); err != nil {
+		return nil, fmt.Errorf("failed to commit: %w", err)
+	}
+
+	return task, nil
+}
+
+// updateInternal modifies an existing task without git commit.
+// Used internally by Claim, Release, etc. that handle their own commits.
+func (l *Local) updateInternal(id string, changes backend.TaskChanges) (*backend.Task, error) {
 	if !l.connected {
 		return nil, errors.New("not connected")
 	}
@@ -357,7 +391,24 @@ func (l *Local) Delete(id string) error {
 }
 
 // Move transitions a task to a new status.
+// This is the public method that commits changes to git if enabled.
 func (l *Local) Move(id string, status backend.Status) (*backend.Task, error) {
+	task, err := l.moveInternal(id, status)
+	if err != nil {
+		return nil, err
+	}
+
+	// Git commit if enabled
+	if err := l.gitCommit("move", id); err != nil {
+		return nil, fmt.Errorf("failed to commit: %w", err)
+	}
+
+	return task, nil
+}
+
+// moveInternal transitions a task to a new status without git commit.
+// Used internally by Claim, Release, etc. that handle their own commits.
+func (l *Local) moveInternal(id string, status backend.Status) (*backend.Task, error) {
 	if !l.connected {
 		return nil, errors.New("not connected")
 	}
@@ -396,14 +447,16 @@ func (l *Local) Move(id string, status backend.Status) (*backend.Task, error) {
 }
 
 // Assign assigns a task to a user.
+// Uses updateInternal to avoid duplicate git commits when used in compound operations.
 func (l *Local) Assign(id string, assignee string) (*backend.Task, error) {
-	return l.Update(id, backend.TaskChanges{Assignee: &assignee})
+	return l.updateInternal(id, backend.TaskChanges{Assignee: &assignee})
 }
 
 // Unassign removes the assignee from a task.
+// Uses updateInternal to avoid duplicate git commits when used in compound operations.
 func (l *Local) Unassign(id string) (*backend.Task, error) {
 	empty := ""
-	return l.Update(id, backend.TaskChanges{Assignee: &empty})
+	return l.updateInternal(id, backend.TaskChanges{Assignee: &empty})
 }
 
 // ListComments returns all comments for a task.
@@ -463,6 +516,11 @@ func (l *Local) AddComment(id string, body string) (*backend.Comment, error) {
 
 	if err := l.writeTask(task); err != nil {
 		return nil, fmt.Errorf("failed to write task: %w", err)
+	}
+
+	// Git commit if enabled
+	if err := l.gitCommit("comment", id); err != nil {
+		return nil, fmt.Errorf("failed to commit: %w", err)
 	}
 
 	return &comment, nil
@@ -641,6 +699,9 @@ func (l *Local) Claim(id string, agentID string) (*backend.ClaimResult, error) {
 	// Use the provided agentID, or fall back to the configured one
 	if agentID == "" {
 		agentID = l.agentID
+	} else {
+		// Update l.agentID for use in gitCommit message
+		l.agentID = agentID
 	}
 
 	// Find the task
@@ -693,18 +754,23 @@ func (l *Local) Claim(id string, agentID string) (*backend.ClaimResult, error) {
 	}
 
 	// Move to in-progress and apply label changes
-	task, err = l.Update(id, changes)
+	task, err = l.updateInternal(id, changes)
 	if err != nil {
 		// Try to remove the lock if we fail to update the task
 		l.removeLock(id)
 		return nil, fmt.Errorf("failed to update task: %w", err)
 	}
 
-	task, err = l.Move(id, backend.StatusInProgress)
+	task, err = l.moveInternal(id, backend.StatusInProgress)
 	if err != nil {
 		// Try to remove the lock if we fail to move the task
 		l.removeLock(id)
 		return nil, fmt.Errorf("failed to move task: %w", err)
+	}
+
+	// Git commit if enabled
+	if err := l.gitCommit("claim", id); err != nil {
+		return nil, fmt.Errorf("failed to commit: %w", err)
 	}
 
 	return &backend.ClaimResult{
@@ -734,7 +800,7 @@ func (l *Local) Release(id string) error {
 	// Remove agent labels
 	agentLabels := l.findAgentLabels(task.Labels)
 	if len(agentLabels) > 0 {
-		_, err = l.Update(id, backend.TaskChanges{
+		_, err = l.updateInternal(id, backend.TaskChanges{
 			RemoveLabels: agentLabels,
 		})
 		if err != nil {
@@ -742,16 +808,21 @@ func (l *Local) Release(id string) error {
 		}
 	}
 
-	// Unassign the task
+	// Unassign the task (uses updateInternal internally)
 	_, err = l.Unassign(id)
 	if err != nil {
 		return fmt.Errorf("failed to unassign task: %w", err)
 	}
 
 	// Move to todo
-	_, err = l.Move(id, backend.StatusTodo)
+	_, err = l.moveInternal(id, backend.StatusTodo)
 	if err != nil {
 		return fmt.Errorf("failed to move task to todo: %w", err)
+	}
+
+	// Git commit if enabled
+	if err := l.gitCommit("release", id); err != nil {
+		return fmt.Errorf("failed to commit: %w", err)
 	}
 
 	return nil
@@ -778,6 +849,48 @@ type ClaimConflictError struct {
 
 func (e *ClaimConflictError) Error() string {
 	return fmt.Sprintf("task %s is already claimed by agent %s", e.TaskID, e.ClaimedBy)
+}
+
+// gitCommit creates a git commit with the given message if git sync is enabled.
+// The action parameter is one of: add, edit, move, claim, release, comment.
+// The taskID is the ID of the task being modified.
+// The agentID is included in the commit message for claim/release operations.
+func (l *Local) gitCommit(action, taskID string) error {
+	if !l.gitSync {
+		return nil
+	}
+
+	// Build commit message
+	var message string
+	if action == "claim" || action == "release" {
+		message = fmt.Sprintf("%s: %s [agent:%s]", action, taskID, l.agentID)
+	} else {
+		message = fmt.Sprintf("%s: %s", action, taskID)
+	}
+
+	// Get the parent directory of the .backlog folder to run git commands
+	// l.path is absolute, so we get its parent for the git repo root
+	gitDir := filepath.Dir(l.path)
+
+	// Stage all changes in the .backlog directory
+	addCmd := exec.Command("git", "add", l.path)
+	addCmd.Dir = gitDir
+	if output, err := addCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git add failed: %w\n%s", err, output)
+	}
+
+	// Commit the changes
+	commitCmd := exec.Command("git", "commit", "-m", message)
+	commitCmd.Dir = gitDir
+	if output, err := commitCmd.CombinedOutput(); err != nil {
+		// If nothing to commit, that's OK
+		if strings.Contains(string(output), "nothing to commit") {
+			return nil
+		}
+		return fmt.Errorf("git commit failed: %w\n%s", err, output)
+	}
+
+	return nil
 }
 
 // Register registers the local backend with the registry.
