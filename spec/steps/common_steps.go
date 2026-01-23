@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/cucumber/godog"
 
@@ -140,6 +141,17 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^no lock file should exist for task "([^"]*)"$`, noLockFileShouldExistForTask)
 	ctx.Step(`^task "([^"]*)" should be claimed by "([^"]*)"$`, taskShouldBeClaimedBy)
 	ctx.Step(`^task "([^"]*)" should not be claimed$`, taskShouldNotBeClaimed)
+
+	// Lock file content verification steps
+	ctx.Step(`^the lock file for task "([^"]*)" should contain agent "([^"]*)"$`, theLockFileForTaskShouldContainAgent)
+	ctx.Step(`^the lock file for task "([^"]*)" should have a valid claimed_at timestamp$`, theLockFileForTaskShouldHaveValidClaimedAt)
+	ctx.Step(`^the lock file for task "([^"]*)" should have a valid expires_at timestamp$`, theLockFileForTaskShouldHaveValidExpiresAt)
+	ctx.Step(`^the lock file for task "([^"]*)" should have expires_at after claimed_at$`, theLockFileForTaskShouldHaveExpiresAtAfterClaimedAt)
+
+	// Stale/expired lock setup steps
+	ctx.Step(`^task "([^"]*)" has a stale lock from agent "([^"]*)" that expired (\d+) hour(?:s)? ago$`, taskHasStaleLockHoursAgo)
+	ctx.Step(`^task "([^"]*)" has a lock from agent "([^"]*)" that expired (\d+) minute(?:s)? ago$`, taskHasExpiredLockMinutesAgo)
+	ctx.Step(`^task "([^"]*)" has an active lock from agent "([^"]*)"$`, taskHasActiveLock)
 }
 
 // aFreshBacklogDirectory creates a new empty .backlog directory.
@@ -1254,4 +1266,232 @@ func taskShouldNotBeClaimed(ctx context.Context, taskID string) error {
 	}
 
 	return nil
+}
+
+// LockFile represents the parsed contents of a lock file.
+type LockFile struct {
+	Agent     string
+	ClaimedAt time.Time
+	ExpiresAt time.Time
+}
+
+// readLockFile reads and parses a lock file for a task.
+func readLockFile(env *support.TestEnv, taskID string) (*LockFile, error) {
+	lockPath := filepath.Join(".backlog", ".locks", taskID+".lock")
+	content, err := env.ReadFile(lockPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read lock file: %w", err)
+	}
+
+	lock := &LockFile{}
+	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "agent:") {
+			lock.Agent = strings.TrimSpace(strings.TrimPrefix(line, "agent:"))
+		} else if strings.HasPrefix(line, "claimed_at:") {
+			ts := strings.TrimSpace(strings.TrimPrefix(line, "claimed_at:"))
+			t, err := time.Parse(time.RFC3339, ts)
+			if err != nil {
+				return nil, fmt.Errorf("invalid claimed_at timestamp: %w", err)
+			}
+			lock.ClaimedAt = t
+		} else if strings.HasPrefix(line, "expires_at:") {
+			ts := strings.TrimSpace(strings.TrimPrefix(line, "expires_at:"))
+			t, err := time.Parse(time.RFC3339, ts)
+			if err != nil {
+				return nil, fmt.Errorf("invalid expires_at timestamp: %w", err)
+			}
+			lock.ExpiresAt = t
+		}
+	}
+
+	return lock, nil
+}
+
+// theLockFileForTaskShouldContainAgent verifies the lock file contains the expected agent.
+func theLockFileForTaskShouldContainAgent(ctx context.Context, taskID, expectedAgent string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	lock, err := readLockFile(env, taskID)
+	if err != nil {
+		return err
+	}
+
+	if lock.Agent != expectedAgent {
+		return fmt.Errorf("expected lock file for task %s to contain agent %q, got %q", taskID, expectedAgent, lock.Agent)
+	}
+
+	return nil
+}
+
+// theLockFileForTaskShouldHaveValidClaimedAt verifies the lock file has a valid claimed_at timestamp.
+func theLockFileForTaskShouldHaveValidClaimedAt(ctx context.Context, taskID string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	lock, err := readLockFile(env, taskID)
+	if err != nil {
+		return err
+	}
+
+	if lock.ClaimedAt.IsZero() {
+		return fmt.Errorf("expected lock file for task %s to have a valid claimed_at timestamp, but it was zero or missing", taskID)
+	}
+
+	return nil
+}
+
+// theLockFileForTaskShouldHaveValidExpiresAt verifies the lock file has a valid expires_at timestamp.
+func theLockFileForTaskShouldHaveValidExpiresAt(ctx context.Context, taskID string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	lock, err := readLockFile(env, taskID)
+	if err != nil {
+		return err
+	}
+
+	if lock.ExpiresAt.IsZero() {
+		return fmt.Errorf("expected lock file for task %s to have a valid expires_at timestamp, but it was zero or missing", taskID)
+	}
+
+	return nil
+}
+
+// theLockFileForTaskShouldHaveExpiresAtAfterClaimedAt verifies expires_at is after claimed_at.
+func theLockFileForTaskShouldHaveExpiresAtAfterClaimedAt(ctx context.Context, taskID string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	lock, err := readLockFile(env, taskID)
+	if err != nil {
+		return err
+	}
+
+	if !lock.ExpiresAt.After(lock.ClaimedAt) {
+		return fmt.Errorf("expected expires_at (%v) to be after claimed_at (%v) for task %s",
+			lock.ExpiresAt, lock.ClaimedAt, taskID)
+	}
+
+	return nil
+}
+
+// taskHasStaleLockHoursAgo creates a stale lock file that expired N hours ago.
+func taskHasStaleLockHoursAgo(ctx context.Context, taskID, agentID string, hoursAgo int) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	now := time.Now().UTC()
+	claimedAt := now.Add(-time.Duration(hoursAgo+1) * time.Hour)
+	expiresAt := now.Add(-time.Duration(hoursAgo) * time.Hour)
+
+	content := fmt.Sprintf("agent: %s\nclaimed_at: %s\nexpires_at: %s\n",
+		agentID,
+		claimedAt.Format(time.RFC3339),
+		expiresAt.Format(time.RFC3339))
+
+	lockPath := filepath.Join(".backlog", ".locks", taskID+".lock")
+	if err := env.CreateFile(lockPath, content); err != nil {
+		return ctx, fmt.Errorf("failed to create stale lock file: %w", err)
+	}
+
+	return ctx, nil
+}
+
+// taskHasExpiredLockMinutesAgo creates a lock file that expired N minutes ago.
+func taskHasExpiredLockMinutesAgo(ctx context.Context, taskID, agentID string, minutesAgo int) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	now := time.Now().UTC()
+	claimedAt := now.Add(-time.Duration(minutesAgo+30) * time.Minute)
+	expiresAt := now.Add(-time.Duration(minutesAgo) * time.Minute)
+
+	content := fmt.Sprintf("agent: %s\nclaimed_at: %s\nexpires_at: %s\n",
+		agentID,
+		claimedAt.Format(time.RFC3339),
+		expiresAt.Format(time.RFC3339))
+
+	lockPath := filepath.Join(".backlog", ".locks", taskID+".lock")
+	if err := env.CreateFile(lockPath, content); err != nil {
+		return ctx, fmt.Errorf("failed to create expired lock file: %w", err)
+	}
+
+	// Also add the agent label to the task to simulate a previous claim
+	reader := support.NewTaskFileReader(env.Path(".backlog"))
+	task := reader.ReadTask(taskID)
+	if task.ParseErr == nil {
+		// Read the file content
+		taskContent, err := os.ReadFile(task.Path)
+		if err == nil {
+			contentStr := string(taskContent)
+			agentLabel := fmt.Sprintf("agent:%s", agentID)
+			if !strings.Contains(contentStr, agentLabel) {
+				if strings.Contains(contentStr, "labels: []") {
+					contentStr = strings.Replace(contentStr, "labels: []", fmt.Sprintf("labels: [%s]", agentLabel), 1)
+				} else if strings.Contains(contentStr, "labels: [") {
+					contentStr = strings.Replace(contentStr, "labels: [", fmt.Sprintf("labels: [%s, ", agentLabel), 1)
+				}
+				os.WriteFile(task.Path, []byte(contentStr), 0644)
+			}
+		}
+	}
+
+	return ctx, nil
+}
+
+// taskHasActiveLock creates an active (non-expired) lock file.
+func taskHasActiveLock(ctx context.Context, taskID, agentID string) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	now := time.Now().UTC()
+	claimedAt := now.Add(-5 * time.Minute)
+	expiresAt := now.Add(25 * time.Minute) // 30 min TTL, 5 min elapsed
+
+	content := fmt.Sprintf("agent: %s\nclaimed_at: %s\nexpires_at: %s\n",
+		agentID,
+		claimedAt.Format(time.RFC3339),
+		expiresAt.Format(time.RFC3339))
+
+	lockPath := filepath.Join(".backlog", ".locks", taskID+".lock")
+	if err := env.CreateFile(lockPath, content); err != nil {
+		return ctx, fmt.Errorf("failed to create active lock file: %w", err)
+	}
+
+	// Also add the agent label to the task
+	reader := support.NewTaskFileReader(env.Path(".backlog"))
+	task := reader.ReadTask(taskID)
+	if task.ParseErr == nil {
+		taskContent, err := os.ReadFile(task.Path)
+		if err == nil {
+			contentStr := string(taskContent)
+			agentLabel := fmt.Sprintf("agent:%s", agentID)
+			if !strings.Contains(contentStr, agentLabel) {
+				if strings.Contains(contentStr, "labels: []") {
+					contentStr = strings.Replace(contentStr, "labels: []", fmt.Sprintf("labels: [%s]", agentLabel), 1)
+				} else if strings.Contains(contentStr, "labels: [") {
+					contentStr = strings.Replace(contentStr, "labels: [", fmt.Sprintf("labels: [%s, ", agentLabel), 1)
+				}
+				os.WriteFile(task.Path, []byte(contentStr), 0644)
+			}
+		}
+	}
+
+	return ctx, nil
 }

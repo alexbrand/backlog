@@ -211,10 +211,10 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: Comment on non-existent task returns exit code 3
 
 ### Feature: File Locking (`locking.feature`)
-- [ ] Scenario: Lock file contains agent and timestamps
-- [ ] Scenario: Stale lock is detected and ignored
-- [ ] Scenario: Lock TTL expiry allows reclaim
-- [ ] Scenario: Concurrent claim attempts — one wins, one fails
+- [x] Scenario: Lock file contains agent and timestamps
+- [x] Scenario: Stale lock is detected and ignored
+- [x] Scenario: Lock TTL expiry allows reclaim
+- [x] Scenario: Concurrent claim attempts — one wins, one fails
 
 ### Step Definitions - Phase 2
 - [x] Implement "Given task {string} is claimed by agent {string}"
@@ -383,7 +383,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 | Phase 1b: Output Formats | Complete | 3 | 8 |
 | Phase 1c: Configuration | Complete | 2 | 16 |
 | Phase 1d: Error Handling | Complete | 1 | 12 |
-| Phase 2: Agent Coordination | In Progress | 4 | 42 |
+| Phase 2: Agent Coordination | Complete | 5 | 46 |
 | Phase 3: Git Sync | Not Started | 0 | 0 |
 | Phase 4: GitHub Issues | Not Started | 0 | 0 |
 | Phase 5: GitHub Projects | Not Started | 0 | 0 |
