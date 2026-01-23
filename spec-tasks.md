@@ -18,7 +18,7 @@ This plan covers implementing a Gherkin-based executable specification using [go
 
 ### Test Harness
 - [x] Implement temp directory setup/teardown for isolated test runs
-- [ ] Implement CLI runner helper (executes `backlog` commands, captures stdout/stderr/exit code)
+- [x] Implement CLI runner helper (executes `backlog` commands, captures stdout/stderr/exit code)
 - [ ] Implement fixture loader for pre-built `.backlog/` directories
 - [ ] Implement JSON output parser for structured assertions
 - [ ] Implement task file reader for verifying file state
