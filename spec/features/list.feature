@@ -116,3 +116,19 @@ Feature: Listing Tasks
     And stdout should not contain "Second task"
     And stdout should not contain "Third task"
     And stdout should not contain "Fifth task"
+
+  Scenario: List with multiple status values
+    Given a backlog with the following tasks:
+      | id    | title           | status      | priority |
+      | task1 | First task      | todo        | high     |
+      | task2 | Second task     | in-progress | medium   |
+      | task3 | Third task      | backlog     | low      |
+      | task4 | Fourth task     | review      | low      |
+      | task5 | Fifth task      | done        | high     |
+    When I run "backlog list --status=todo,in-progress"
+    Then the exit code should be 0
+    And stdout should contain "First task"
+    And stdout should contain "Second task"
+    And stdout should not contain "Third task"
+    And stdout should not contain "Fourth task"
+    And stdout should not contain "Fifth task"

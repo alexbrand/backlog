@@ -66,7 +66,7 @@ This plan covers implementing a Gherkin-based executable specification using [go
 - [x] Scenario: List tasks in plain format
 - [x] Scenario: List tasks in id-only format
 - [x] Scenario: List with status filter
-- [ ] Scenario: List with multiple status values
+- [x] Scenario: List with multiple status values
 - [ ] Scenario: List with priority filter
 - [ ] Scenario: List with label filter
 - [ ] Scenario: List with assignee filter
