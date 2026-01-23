@@ -209,7 +209,7 @@
 - [x] Add examples for agent integration patterns
 
 ### Build & Distribution
-- [ ] Set up cross-compilation (darwin/arm64, linux/amd64, windows/amd64)
+- [x] Set up cross-compilation (darwin/arm64, linux/amd64, windows/amd64)
 - [ ] Create GitHub Actions workflow for releases
 - [ ] Set up Homebrew tap
 - [ ] Publish to `go install`

@@ -1,6 +1,69 @@
 # Makefile for backlog CLI
 
+# Build variables
+BINARY_NAME := backlog
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_TIME := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
+LDFLAGS := -ldflags "-s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.buildTime=$(BUILD_TIME)"
+
+# Output directory
+DIST_DIR := dist
+
+.PHONY: build build-all build-darwin-arm64 build-darwin-amd64 build-linux-amd64 build-linux-arm64 build-windows-amd64
+.PHONY: clean test lint install
 .PHONY: spec spec-local spec-github spec-linear spec-all spec-coverage spec-coverage-html spec-report spec-report-html spec-docs
+
+# Build for current platform
+build:
+	go build $(LDFLAGS) -o $(BINARY_NAME) ./cmd/backlog
+
+# Install to GOPATH/bin
+install:
+	go install $(LDFLAGS) ./cmd/backlog
+
+# Build for all platforms
+build-all: build-darwin-arm64 build-darwin-amd64 build-linux-amd64 build-linux-arm64 build-windows-amd64
+	@echo "All builds complete. Binaries in $(DIST_DIR)/"
+
+# macOS ARM64 (Apple Silicon)
+build-darwin-arm64:
+	@mkdir -p $(DIST_DIR)
+	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-darwin-arm64 ./cmd/backlog
+
+# macOS AMD64 (Intel)
+build-darwin-amd64:
+	@mkdir -p $(DIST_DIR)
+	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-darwin-amd64 ./cmd/backlog
+
+# Linux AMD64
+build-linux-amd64:
+	@mkdir -p $(DIST_DIR)
+	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-linux-amd64 ./cmd/backlog
+
+# Linux ARM64
+build-linux-arm64:
+	@mkdir -p $(DIST_DIR)
+	GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-linux-arm64 ./cmd/backlog
+
+# Windows AMD64
+build-windows-amd64:
+	@mkdir -p $(DIST_DIR)
+	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-windows-amd64.exe ./cmd/backlog
+
+# Clean build artifacts
+clean:
+	rm -f $(BINARY_NAME)
+	rm -rf $(DIST_DIR)
+	rm -f spec/coverage.out spec/coverage.html spec/cucumber.json spec/report.html
+
+# Run tests
+test:
+	go test -v ./...
+
+# Run linter (requires golangci-lint)
+lint:
+	golangci-lint run
 
 # Run Gherkin specs (excludes @remote tests by default)
 spec:

@@ -4,6 +4,7 @@
 # Go build artifacts
 /backlog
 /backlog-*
+/dist/
 
 # Coverage files
 coverage.out
