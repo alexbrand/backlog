@@ -53,7 +53,6 @@ func runEdit(id string) error {
 	// Check if any changes were specified
 	if editTitle == "" && editPriority == "" && editDescription == "" &&
 		len(editAddLabels) == 0 && len(editRemoveLabel) == 0 {
-		fmt.Fprintf(os.Stderr, "error: no changes specified\n")
 		return fmt.Errorf("no changes specified")
 	}
 
@@ -62,8 +61,7 @@ func runEdit(id string) error {
 	if editPriority != "" {
 		p := backend.Priority(editPriority)
 		if !p.IsValid() {
-			fmt.Fprintf(os.Stderr, "error: invalid priority %q (valid: urgent, high, medium, low, none)\n", editPriority)
-			return fmt.Errorf("invalid priority: %s", editPriority)
+			return InvalidInputError(fmt.Sprintf("invalid priority %q (valid: urgent, high, medium, low, none)", editPriority))
 		}
 		priority = &p
 	}
@@ -78,7 +76,6 @@ func runEdit(id string) error {
 		// Have config - use it
 		b, err = backend.Get(ws.Backend)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return err
 		}
 
@@ -96,7 +93,6 @@ func runEdit(id string) error {
 			}
 			backendCfg.Workspace = &local.WorkspaceConfig{Path: path}
 		default:
-			fmt.Fprintf(os.Stderr, "error: unsupported backend: %s\n", ws.Backend)
 			return fmt.Errorf("unsupported backend: %s", ws.Backend)
 		}
 	} else {
@@ -105,7 +101,6 @@ func runEdit(id string) error {
 			// Local .backlog directory exists - use local backend
 			b, err = backend.Get("local")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return err
 			}
 			backendCfg = backend.Config{
@@ -113,14 +108,12 @@ func runEdit(id string) error {
 			}
 		} else {
 			// No config and no local .backlog directory
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return err
 		}
 	}
 
 	if err := b.Connect(backendCfg); err != nil {
-		fmt.Fprintf(os.Stderr, "error: failed to connect to backend: %v\n", err)
-		return err
+		return fmt.Errorf("failed to connect to backend: %w", err)
 	}
 	defer b.Disconnect()
 
@@ -142,7 +135,6 @@ func runEdit(id string) error {
 	// Update the task
 	task, err := b.Update(id, changes)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		if strings.Contains(err.Error(), "not found") {
 			return NotFoundError(err.Error())
 		}

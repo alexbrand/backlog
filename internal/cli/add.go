@@ -51,7 +51,6 @@ func init() {
 func runAdd(title string) error {
 	// Validate title
 	if title == "" {
-		fmt.Fprintf(os.Stderr, "error: title is required\n")
 		return fmt.Errorf("title is required")
 	}
 
@@ -60,8 +59,7 @@ func runAdd(title string) error {
 	if addBodyFile != "" {
 		content, err := os.ReadFile(addBodyFile)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: failed to read body file: %v\n", err)
-			return err
+			return fmt.Errorf("failed to read body file: %w", err)
 		}
 		description = string(content)
 	}
@@ -71,8 +69,7 @@ func runAdd(title string) error {
 	if addPriority != "" {
 		priority = backend.Priority(addPriority)
 		if !priority.IsValid() {
-			fmt.Fprintf(os.Stderr, "error: invalid priority %q (valid: urgent, high, medium, low, none)\n", addPriority)
-			return fmt.Errorf("invalid priority: %s", addPriority)
+			return InvalidInputError(fmt.Sprintf("invalid priority %q (valid: urgent, high, medium, low, none)", addPriority))
 		}
 	}
 
@@ -81,8 +78,7 @@ func runAdd(title string) error {
 	if addStatus != "" {
 		status = backend.Status(addStatus)
 		if !status.IsValid() {
-			fmt.Fprintf(os.Stderr, "error: invalid status %q (valid: backlog, todo, in-progress, review, done)\n", addStatus)
-			return fmt.Errorf("invalid status: %s", addStatus)
+			return InvalidInputError(fmt.Sprintf("invalid status %q (valid: backlog, todo, in-progress, review, done)", addStatus))
 		}
 	}
 
@@ -96,7 +92,6 @@ func runAdd(title string) error {
 		// Have config - use it
 		b, err = backend.Get(ws.Backend)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return err
 		}
 
@@ -114,7 +109,6 @@ func runAdd(title string) error {
 			}
 			backendCfg.Workspace = &local.WorkspaceConfig{Path: path}
 		default:
-			fmt.Fprintf(os.Stderr, "error: unsupported backend: %s\n", ws.Backend)
 			return fmt.Errorf("unsupported backend: %s", ws.Backend)
 		}
 	} else {
@@ -123,7 +117,6 @@ func runAdd(title string) error {
 			// Local .backlog directory exists - use local backend
 			b, err = backend.Get("local")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return err
 			}
 			backendCfg = backend.Config{
@@ -131,14 +124,12 @@ func runAdd(title string) error {
 			}
 		} else {
 			// No config and no local .backlog directory
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return err
 		}
 	}
 
 	if err := b.Connect(backendCfg); err != nil {
-		fmt.Fprintf(os.Stderr, "error: failed to connect to backend: %v\n", err)
-		return err
+		return fmt.Errorf("failed to connect to backend: %w", err)
 	}
 	defer b.Disconnect()
 
@@ -153,8 +144,7 @@ func runAdd(title string) error {
 
 	task, err := b.Create(input)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: failed to create task: %v\n", err)
-		return err
+		return fmt.Errorf("failed to create task: %w", err)
 	}
 
 	// Output the result

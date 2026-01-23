@@ -1,6 +1,11 @@
 package cli
 
-import "fmt"
+import (
+	"fmt"
+	"io"
+
+	"github.com/alexbrand/backlog/internal/output"
+)
 
 // Exit codes as defined in the PRD
 const (
@@ -13,9 +18,10 @@ const (
 
 // ExitError is an error that carries an exit code.
 type ExitCodeError struct {
-	Code    int
-	Message string
-	Err     error
+	Code     int
+	JSONCode string // Optional specific error code for JSON output (e.g., "INVALID_INPUT")
+	Message  string
+	Err      error
 }
 
 func (e *ExitCodeError) Error() string {
@@ -54,6 +60,11 @@ func ConfigError(message string) *ExitCodeError {
 	return NewExitCodeError(ExitConfigError, message)
 }
 
+// InvalidInputError creates an invalid input error (exit code 1).
+func InvalidInputError(message string) *ExitCodeError {
+	return &ExitCodeError{Code: ExitError, JSONCode: "INVALID_INPUT", Message: message}
+}
+
 // GetExitCode returns the exit code from an error.
 // If the error is an ExitCodeError, returns its code.
 // Otherwise, returns 1 (general error).
@@ -65,4 +76,47 @@ func GetExitCode(err error) int {
 		return exitErr.Code
 	}
 	return ExitError
+}
+
+// ExitCodeToString converts a numeric exit code to a string error code.
+// These codes are used in JSON error output.
+func ExitCodeToString(code int) string {
+	switch code {
+	case ExitSuccess:
+		return "SUCCESS"
+	case ExitError:
+		return "ERROR"
+	case ExitConflict:
+		return "CONFLICT"
+	case ExitNotFound:
+		return "NOT_FOUND"
+	case ExitConfigError:
+		return "CONFIG_ERROR"
+	default:
+		return "ERROR"
+	}
+}
+
+// GetJSONCode returns the appropriate JSON error code for an error.
+// It first checks for a specific JSONCode on ExitCodeError, then falls back
+// to converting the exit code.
+func GetJSONCode(err error) string {
+	if exitErr, ok := err.(*ExitCodeError); ok && exitErr.JSONCode != "" {
+		return exitErr.JSONCode
+	}
+	return ExitCodeToString(GetExitCode(err))
+}
+
+// PrintError outputs an error using the appropriate formatter.
+// When format is "json", it outputs a structured JSON error to the writer.
+// For other formats, it outputs a plain text error message.
+func PrintError(w io.Writer, err error, format string) {
+	if err == nil {
+		return
+	}
+
+	formatter := output.New(output.Format(format))
+	codeStr := GetJSONCode(err)
+
+	formatter.FormatError(w, codeStr, err.Error(), nil)
 }

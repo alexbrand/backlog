@@ -37,8 +37,7 @@ func runMove(id, statusStr string) error {
 	// Validate status
 	status := backend.Status(statusStr)
 	if !status.IsValid() {
-		fmt.Fprintf(os.Stderr, "error: invalid status %q (valid: backlog, todo, in-progress, review, done)\n", statusStr)
-		return fmt.Errorf("invalid status: %s", statusStr)
+		return InvalidInputError(fmt.Sprintf("invalid status %q (valid: backlog, todo, in-progress, review, done)", statusStr))
 	}
 
 	// Get backend and configuration
@@ -51,7 +50,6 @@ func runMove(id, statusStr string) error {
 		// Have config - use it
 		b, err = backend.Get(ws.Backend)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return err
 		}
 
@@ -69,7 +67,6 @@ func runMove(id, statusStr string) error {
 			}
 			backendCfg.Workspace = &local.WorkspaceConfig{Path: path}
 		default:
-			fmt.Fprintf(os.Stderr, "error: unsupported backend: %s\n", ws.Backend)
 			return fmt.Errorf("unsupported backend: %s", ws.Backend)
 		}
 	} else {
@@ -78,7 +75,6 @@ func runMove(id, statusStr string) error {
 			// Local .backlog directory exists - use local backend
 			b, err = backend.Get("local")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return err
 			}
 			backendCfg = backend.Config{
@@ -86,21 +82,18 @@ func runMove(id, statusStr string) error {
 			}
 		} else {
 			// No config and no local .backlog directory
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return err
 		}
 	}
 
 	if err := b.Connect(backendCfg); err != nil {
-		fmt.Fprintf(os.Stderr, "error: failed to connect to backend: %v\n", err)
-		return err
+		return fmt.Errorf("failed to connect to backend: %w", err)
 	}
 	defer b.Disconnect()
 
 	// Get the current task first to capture old status
 	currentTask, err := b.Get(id)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		if strings.Contains(err.Error(), "not found") {
 			return NotFoundError(err.Error())
 		}
@@ -112,7 +105,6 @@ func runMove(id, statusStr string) error {
 	// Move the task
 	task, err := b.Move(id, status)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		if strings.Contains(err.Error(), "not found") {
 			return NotFoundError(err.Error())
 		}

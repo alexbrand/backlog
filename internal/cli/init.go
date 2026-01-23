@@ -37,7 +37,6 @@ func runInit() error {
 
 	// Check if .backlog already exists
 	if _, err := os.Stat(backlogDir); err == nil {
-		fmt.Fprintf(os.Stderr, "error: %s already exists\n", backlogDir)
 		return fmt.Errorf("%s already exists", backlogDir)
 	}
 
@@ -54,16 +53,14 @@ func runInit() error {
 	for _, dir := range statusDirs {
 		path := filepath.Join(backlogDir, dir)
 		if err := os.MkdirAll(path, 0755); err != nil {
-			fmt.Fprintf(os.Stderr, "error: failed to create directory %s: %v\n", path, err)
-			return err
+			return fmt.Errorf("failed to create directory %s: %w", path, err)
 		}
 	}
 
 	// Create .locks directory
 	locksDir := filepath.Join(backlogDir, ".locks")
 	if err := os.MkdirAll(locksDir, 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "error: failed to create directory %s: %v\n", locksDir, err)
-		return err
+		return fmt.Errorf("failed to create directory %s: %w", locksDir, err)
 	}
 
 	// Create config.yaml
@@ -79,8 +76,7 @@ defaults:
   format: table
 `
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "error: failed to create config file: %v\n", err)
-		return err
+		return fmt.Errorf("failed to create config file: %w", err)
 	}
 
 	fmt.Println("Initialized backlog in .backlog/")

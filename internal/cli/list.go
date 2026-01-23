@@ -60,8 +60,7 @@ func runList() error {
 	for _, s := range listStatus {
 		status := backend.Status(s)
 		if !status.IsValid() {
-			fmt.Fprintf(os.Stderr, "error: invalid status %q (valid: backlog, todo, in-progress, review, done)\n", s)
-			return fmt.Errorf("invalid status: %s", s)
+			return InvalidInputError(fmt.Sprintf("invalid status %q (valid: backlog, todo, in-progress, review, done)", s))
 		}
 		statusFilters = append(statusFilters, status)
 	}
@@ -71,8 +70,7 @@ func runList() error {
 	for _, p := range listPriority {
 		priority := backend.Priority(p)
 		if !priority.IsValid() {
-			fmt.Fprintf(os.Stderr, "error: invalid priority %q (valid: urgent, high, medium, low, none)\n", p)
-			return fmt.Errorf("invalid priority: %s", p)
+			return InvalidInputError(fmt.Sprintf("invalid priority %q (valid: urgent, high, medium, low, none)", p))
 		}
 		priorityFilters = append(priorityFilters, priority)
 	}
@@ -97,7 +95,6 @@ func runList() error {
 		// Have config - use it
 		b, err = backend.Get(ws.Backend)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return err
 		}
 
@@ -115,7 +112,6 @@ func runList() error {
 			}
 			backendCfg.Workspace = &local.WorkspaceConfig{Path: path}
 		default:
-			fmt.Fprintf(os.Stderr, "error: unsupported backend: %s\n", ws.Backend)
 			return fmt.Errorf("unsupported backend: %s", ws.Backend)
 		}
 	} else {
@@ -124,7 +120,6 @@ func runList() error {
 			// Local .backlog directory exists - use local backend
 			b, err = backend.Get("local")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return err
 			}
 			backendCfg = backend.Config{
@@ -132,22 +127,19 @@ func runList() error {
 			}
 		} else {
 			// No config and no local .backlog directory
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return err
 		}
 	}
 
 	if err := b.Connect(backendCfg); err != nil {
-		fmt.Fprintf(os.Stderr, "error: failed to connect to backend: %v\n", err)
-		return err
+		return fmt.Errorf("failed to connect to backend: %w", err)
 	}
 	defer b.Disconnect()
 
 	// List tasks
 	taskList, err := b.List(filters)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: failed to list tasks: %v\n", err)
-		return err
+		return fmt.Errorf("failed to list tasks: %w", err)
 	}
 
 	// Output the result

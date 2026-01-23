@@ -1,9 +1,6 @@
 package cli
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/alexbrand/backlog/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -29,6 +26,9 @@ to manage backlogs through simple, composable commands.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		return initConfig()
 	},
+	// Silence Cobra's default error/usage printing - we handle it ourselves
+	SilenceErrors: true,
+	SilenceUsage:  true,
 }
 
 // Execute runs the CLI application.
@@ -58,7 +58,6 @@ func initConfig() error {
 	if err := config.Init(cfgFile); err != nil {
 		// If a config file exists but has errors (e.g., invalid YAML), fail with exit code 4
 		// The config.Init function already handles "file not found" gracefully
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return ConfigError(err.Error())
 	}
 

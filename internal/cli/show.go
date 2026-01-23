@@ -50,7 +50,6 @@ func runShow(id string) error {
 		// Have config - use it
 		b, err = backend.Get(ws.Backend)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return err
 		}
 
@@ -68,7 +67,6 @@ func runShow(id string) error {
 			}
 			backendCfg.Workspace = &local.WorkspaceConfig{Path: path}
 		default:
-			fmt.Fprintf(os.Stderr, "error: unsupported backend: %s\n", ws.Backend)
 			return fmt.Errorf("unsupported backend: %s", ws.Backend)
 		}
 	} else {
@@ -77,7 +75,6 @@ func runShow(id string) error {
 			// Local .backlog directory exists - use local backend
 			b, err = backend.Get("local")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 				return err
 			}
 			backendCfg = backend.Config{
@@ -85,21 +82,18 @@ func runShow(id string) error {
 			}
 		} else {
 			// No config and no local .backlog directory
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return err
 		}
 	}
 
 	if err := b.Connect(backendCfg); err != nil {
-		fmt.Fprintf(os.Stderr, "error: failed to connect to backend: %v\n", err)
-		return err
+		return fmt.Errorf("failed to connect to backend: %w", err)
 	}
 	defer b.Disconnect()
 
 	// Get the task
 	task, err := b.Get(id)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		// Check if this is a "not found" error
 		if strings.Contains(err.Error(), "not found") {
 			return NotFoundError(err.Error())
@@ -117,8 +111,7 @@ func runShow(id string) error {
 	if showComments {
 		comments, err := b.ListComments(id)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: failed to list comments: %v\n", err)
-			return err
+			return fmt.Errorf("failed to list comments: %w", err)
 		}
 
 		fmt.Fprintln(os.Stdout)

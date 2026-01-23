@@ -58,7 +58,7 @@
 ### Error Handling
 - [x] Define exit codes (0=success, 1=error, 2=conflict, 3=not found, 4=config error)
 - [x] Implement consistent error output format (stderr)
-- [ ] Implement JSON error output when `--format=json`
+- [x] Implement JSON error output when `--format=json`
 
 ---
 
@@ -216,7 +216,7 @@
 
 | Phase | Status | Tasks |
 |-------|--------|-------|
-| Phase 1: Local CRUD | In Progress | 16/X |
+| Phase 1: Local CRUD | Complete | All done |
 | Phase 2: Agent Coordination | Not Started | 0/X |
 | Phase 3: Git Sync | Not Started | 0/X |
 | Phase 4: GitHub Issues | Not Started | 0/X |
