@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/alexbrand/backlog/internal/config"
+	"github.com/alexbrand/backlog/internal/credentials"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -172,16 +173,36 @@ func configureGitHubBackend(reader *bufio.Reader) (map[string]any, error) {
 	}
 	config["repo"] = repo
 
-	// Check for GITHUB_TOKEN
-	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
+	// Check for GitHub token (env var or credentials file)
+	_, err := credentials.GetGitHubToken()
+	if err != nil {
 		fmt.Println()
-		fmt.Println("Warning: GITHUB_TOKEN environment variable is not set.")
-		fmt.Println("You will need to set it before using the GitHub backend:")
-		fmt.Println("  export GITHUB_TOKEN=your_token")
+		fmt.Println("GitHub token not found.")
+		fmt.Println("Options:")
+		fmt.Println("  1. Enter a token now (will be saved to credentials.yaml)")
+		fmt.Println("  2. Set GITHUB_TOKEN environment variable later")
+		fmt.Print("Enter GitHub token (or press Enter to skip): ")
+		inputToken, _ := reader.ReadString('\n')
+		inputToken = strings.TrimSpace(inputToken)
+		if inputToken != "" {
+			if err := credentials.SaveGitHubToken(inputToken); err != nil {
+				fmt.Printf("Warning: failed to save token: %v\n", err)
+			} else {
+				credPath, _ := credentials.DefaultCredentialsPath()
+				fmt.Printf("Token saved to %s\n", credPath)
+			}
+		} else {
+			fmt.Println("You will need to set GITHUB_TOKEN before using the GitHub backend:")
+			fmt.Println("  export GITHUB_TOKEN=your_token")
+		}
 		fmt.Println()
 	} else {
-		fmt.Println("✓ GITHUB_TOKEN environment variable is set")
+		// Check if it came from env var or credentials file
+		if os.Getenv("GITHUB_TOKEN") != "" {
+			fmt.Println("GitHub token found in GITHUB_TOKEN environment variable")
+		} else {
+			fmt.Println("GitHub token found in credentials.yaml")
+		}
 	}
 
 	// Optional: agent settings

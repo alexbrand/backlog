@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/alexbrand/backlog/internal/config"
+	"github.com/alexbrand/backlog/internal/credentials"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -64,6 +65,16 @@ func initConfig() error {
 		// If a config file exists but has errors (e.g., invalid YAML), fail with exit code 4
 		// The config.Init function already handles "file not found" gracefully
 		return ConfigError(err.Error())
+	}
+
+	// Initialize credentials system (credentials.yaml is optional)
+	if err := credentials.Init(); err != nil {
+		// Credentials file errors should be reported but not fatal
+		// (credentials can come from environment variables)
+		if verbose {
+			// Only show warning in verbose mode
+			_ = err // Warning suppressed in non-verbose mode
+		}
 	}
 
 	// Apply config defaults to flags if not set via CLI

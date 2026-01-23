@@ -7,11 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/alexbrand/backlog/internal/backend"
+	"github.com/alexbrand/backlog/internal/credentials"
 	gh "github.com/google/go-github/v60/github"
 	"golang.org/x/oauth2"
 )
@@ -122,10 +122,10 @@ func (g *GitHub) Connect(cfg backend.Config) error {
 		}
 	}
 
-	// Get token from environment
-	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		return errors.New("GITHUB_TOKEN environment variable not set")
+	// Get token from credentials (env var or credentials.yaml)
+	token, err := credentials.GetGitHubToken()
+	if err != nil {
+		return err
 	}
 
 	// Create authenticated client

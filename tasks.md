@@ -149,7 +149,7 @@
 ### Configuration
 - [x] Implement `backlog config init` — interactive setup
 - [x] Support `GITHUB_TOKEN` environment variable
-- [ ] Support credentials.yaml for token storage
+- [x] Support credentials.yaml for token storage
 
 ---
 
@@ -222,6 +222,6 @@
 | Phase 1: Local CRUD | Complete | All done |
 | Phase 2: Agent Coordination | Complete | All done |
 | Phase 3: Git Sync | Complete | All done |
-| Phase 4: GitHub Issues | In Progress | Backend + CLI done, config init pending |
+| Phase 4: GitHub Issues | Complete | All done |
 | Phase 5: GitHub Projects | Not Started | 0/X |
 | Phase 6: Linear | Not Started | 0/X |
