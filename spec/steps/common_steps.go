@@ -115,6 +115,10 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the JSON output should have "([^"]*)" containing "([^"]*)"$`, theJSONOutputShouldHaveContaining)
 	ctx.Step(`^task "([^"]*)" has the following comments:$`, taskHasTheFollowingComments)
 
+	// Config steps
+	ctx.Step(`^a config file with the following content:$`, aConfigFileWithTheFollowingContent)
+	ctx.Step(`^the config file is removed$`, theConfigFileIsRemoved)
+
 	// Task state verification steps
 	ctx.Step(`^the task "([^"]*)" should have status "([^"]*)"$`, theTaskShouldHaveStatus)
 	ctx.Step(`^the task "([^"]*)" should be in directory "([^"]*)"$`, theTaskShouldBeInDirectory)
@@ -1021,4 +1025,40 @@ func generateTaskID(title string) string {
 	// Remove trailing dashes
 	slug = strings.TrimRight(slug, "-")
 	return slug
+}
+
+// aConfigFileWithTheFollowingContent creates a config file with the specified YAML content.
+func aConfigFileWithTheFollowingContent(ctx context.Context, content *godog.DocString) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	// Ensure .backlog directory exists
+	if !env.FileExists(".backlog") {
+		if err := env.CreateBacklogDir(); err != nil {
+			return ctx, fmt.Errorf("failed to create backlog directory: %w", err)
+		}
+	}
+
+	if err := env.CreateFile(".backlog/config.yaml", content.Content); err != nil {
+		return ctx, fmt.Errorf("failed to create config file: %w", err)
+	}
+
+	return ctx, nil
+}
+
+// theConfigFileIsRemoved removes the config file from the backlog directory.
+func theConfigFileIsRemoved(ctx context.Context) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	configPath := env.Path(".backlog/config.yaml")
+	if err := os.Remove(configPath); err != nil && !os.IsNotExist(err) {
+		return ctx, fmt.Errorf("failed to remove config file: %w", err)
+	}
+
+	return ctx, nil
 }

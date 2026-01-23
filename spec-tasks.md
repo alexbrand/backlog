@@ -141,11 +141,11 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 ## Phase 1c: Configuration Specs
 
 ### Feature: Configuration (`config.feature`)
-- [ ] Scenario: Config show displays current configuration
-- [ ] Scenario: Uses default workspace when not specified
-- [ ] Scenario: Workspace flag overrides default
-- [ ] Scenario: Missing config file uses defaults
-- [ ] Scenario: Invalid config file returns exit code 4
+- [x] Scenario: Config show displays current configuration
+- [x] Scenario: Uses default workspace when not specified
+- [x] Scenario: Workspace flag overrides default
+- [x] Scenario: Missing config file uses defaults
+- [x] Scenario: Invalid config file returns exit code 4
 
 ### Feature: Global Flags (`global_flags.feature`)
 - [ ] Scenario: Quiet flag suppresses non-essential output
@@ -379,9 +379,9 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 | Phase | Status | Feature Files | Scenarios |
 |-------|--------|---------------|-----------|
 | Phase 0: Infrastructure | Complete | 0 | 0 |
-| Phase 1: Local CRUD | In Progress | 5 | 36 |
-| Phase 1b: Output Formats | In Progress | 2 | 8 |
-| Phase 1c: Configuration | Not Started | 0 | 0 |
+| Phase 1: Local CRUD | Complete | 5 | 36 |
+| Phase 1b: Output Formats | Complete | 3 | 8 |
+| Phase 1c: Configuration | Complete | 1 | 5 |
 | Phase 1d: Error Handling | Not Started | 0 | 0 |
 | Phase 2: Agent Coordination | Not Started | 0 | 0 |
 | Phase 3: Git Sync | Not Started | 0 | 0 |
