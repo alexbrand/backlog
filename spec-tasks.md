@@ -381,9 +381,9 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 ## CI/CD Integration
 
 ### Test Execution
-- [ ] Add `make spec` target to run Gherkin specs
-- [ ] Add `make spec-local` for local backend specs only
-- [ ] Add `make spec-github` for GitHub backend specs (requires mock)
+- [x] Add `make spec` target to run Gherkin specs
+- [x] Add `make spec-local` for local backend specs only
+- [x] Add `make spec-github` for GitHub backend specs (requires mock)
 - [ ] Configure GitHub Actions to run specs on PR
 - [ ] Generate test coverage report
 - [ ] Generate HTML spec report for documentation

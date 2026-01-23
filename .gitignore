@@ -1,0 +1,15 @@
+# Compiled test binaries
+*.test
+
+# Go build artifacts
+/backlog
+/backlog-*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
