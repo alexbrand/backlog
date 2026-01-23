@@ -195,14 +195,14 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: Release unclaimed task fails
 
 ### Feature: Next Task (`next.feature`)
-- [ ] Scenario: Next returns highest priority unclaimed task
-- [ ] Scenario: Next with label filter
-- [ ] Scenario: Next with --claim atomically claims
-- [ ] Scenario: Next when no tasks available returns empty
-- [ ] Scenario: Next skips tasks claimed by other agents
-- [ ] Scenario: Next respects priority ordering (urgent > high > medium > low > none)
-- [ ] Scenario: Next in id-only format
-- [ ] Scenario: Next in JSON format
+- [x] Scenario: Next returns highest priority unclaimed task
+- [x] Scenario: Next with label filter
+- [x] Scenario: Next with --claim atomically claims
+- [x] Scenario: Next when no tasks available returns empty
+- [x] Scenario: Next skips tasks claimed by other agents
+- [x] Scenario: Next respects priority ordering (urgent > high > medium > low > none)
+- [x] Scenario: Next in id-only format
+- [x] Scenario: Next in JSON format
 
 ### Feature: Comments (`comment.feature`)
 - [ ] Scenario: Add comment to task
@@ -383,7 +383,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 | Phase 1b: Output Formats | Complete | 3 | 8 |
 | Phase 1c: Configuration | Complete | 2 | 16 |
 | Phase 1d: Error Handling | Complete | 1 | 12 |
-| Phase 2: Agent Coordination | In Progress | 2 | 22 |
+| Phase 2: Agent Coordination | In Progress | 3 | 34 |
 | Phase 3: Git Sync | Not Started | 0 | 0 |
 | Phase 4: GitHub Issues | Not Started | 0 | 0 |
 | Phase 5: GitHub Projects | Not Started | 0 | 0 |
