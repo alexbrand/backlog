@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"os"
+
 	"github.com/alexbrand/backlog/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -13,6 +15,7 @@ var (
 	format    string
 	quiet     bool
 	verbose   bool
+	agentID   string
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -45,12 +48,14 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&format, "format", "f", "", "Output format: table, json, plain, id-only")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "Suppress non-essential output")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Show debug information")
+	rootCmd.PersistentFlags().StringVar(&agentID, "agent-id", "", "Agent identifier for task claiming and coordination")
 
 	// Bind flags to viper
 	viper.BindPFlag("workspace", rootCmd.PersistentFlags().Lookup("workspace"))
 	viper.BindPFlag("format", rootCmd.PersistentFlags().Lookup("format"))
 	viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet"))
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
+	viper.BindPFlag("agent_id", rootCmd.PersistentFlags().Lookup("agent-id"))
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -74,6 +79,19 @@ func initConfig() error {
 		format = "table"
 	}
 
+	// Resolve agent ID with priority chain:
+	// 1. CLI flag (--agent-id) - already set in agentID if provided
+	// 2. Environment variable (BACKLOG_AGENT_ID)
+	// 3. Workspace config (resolved later when workspace is known)
+	// 4. Global default (defaults.agent_id)
+	// 5. Hostname fallback (resolved later if still empty)
+	if agentID == "" {
+		agentID = os.Getenv("BACKLOG_AGENT_ID")
+	}
+	if agentID == "" && cfg != nil {
+		agentID = cfg.Defaults.AgentID
+	}
+
 	return nil
 }
 
@@ -95,4 +113,37 @@ func IsQuiet() bool {
 // IsVerbose returns true if verbose mode is enabled.
 func IsVerbose() bool {
 	return verbose
+}
+
+// GetAgentID returns the resolved agent ID.
+// Note: This returns the partially resolved agent ID (flag/env/global default).
+// For full resolution including workspace config and hostname fallback,
+// use ResolveAgentID with the workspace.
+func GetAgentID() string {
+	return agentID
+}
+
+// ResolveAgentID returns the fully resolved agent ID following the priority chain:
+// 1. CLI flag (--agent-id)
+// 2. Environment variable (BACKLOG_AGENT_ID)
+// 3. Workspace config (workspaces.<name>.agent_id)
+// 4. Global default (defaults.agent_id)
+// 5. Hostname fallback
+func ResolveAgentID(ws *config.Workspace) string {
+	// agentID already contains resolution from flag → env → global default
+	if agentID != "" {
+		return agentID
+	}
+
+	// Try workspace-specific agent ID
+	if ws != nil && ws.AgentID != "" {
+		return ws.AgentID
+	}
+
+	// Fallback to hostname
+	hostname, err := os.Hostname()
+	if err != nil {
+		return "unknown"
+	}
+	return hostname
 }

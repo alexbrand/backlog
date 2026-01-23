@@ -65,10 +65,10 @@
 ## Phase 2: Local Backend — Agent Coordination
 
 ### Agent Identity
-- [ ] Implement `--agent-id` CLI flag
-- [ ] Implement `BACKLOG_AGENT_ID` environment variable support
-- [ ] Implement agent ID resolution chain (flag → env → workspace config → global default → hostname)
-- [ ] Add `agent_id` and `agent_label_prefix` to workspace config
+- [x] Implement `--agent-id` CLI flag
+- [x] Implement `BACKLOG_AGENT_ID` environment variable support
+- [x] Implement agent ID resolution chain (flag → env → workspace config → global default → hostname)
+- [x] Add `agent_id` and `agent_label_prefix` to workspace config (already in config structure)
 
 ### File-Based Locking
 - [ ] Create `.locks/` directory structure
