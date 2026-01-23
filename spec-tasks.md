@@ -285,8 +285,8 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: Claim already-claimed issue returns exit code 2
 
 ### Feature: GitHub Comments (`github_comments.feature`)
-- [ ] Scenario: Comment adds issue comment via API
-- [ ] Scenario: Show with --comments fetches comment thread
+- [x] Scenario: Comment adds issue comment via API
+- [x] Scenario: Show with --comments fetches comment thread
 
 ### Step Definitions - Phase 4
 - [ ] Implement mock GitHub API server for testing
@@ -385,7 +385,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 | Phase 1d: Error Handling | Complete | 1 | 12 |
 | Phase 2: Agent Coordination | Complete | 5 | 46 |
 | Phase 3: Git Sync | Complete | 2 | 19 |
-| Phase 4: GitHub Issues | In Progress | 4 | 53 |
+| Phase 4: GitHub Issues | In Progress | 6 | 73 |
 | Phase 5: GitHub Projects | Not Started | 0 | 0 |
 | Phase 6: Linear | Not Started | 0 | 0 |
 | Cross-Cutting | Not Started | 0 | 0 |

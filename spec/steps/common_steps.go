@@ -187,6 +187,9 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^a credentials file with the following content:$`, aCredentialsFileWithTheFollowingContent)
 	ctx.Step(`^the environment variable "([^"]*)" is not set$`, theEnvironmentVariableIsNotSet)
 	ctx.Step(`^the environment variable "([^"]*)" is set to a valid token$`, theEnvironmentVariableIsSetToAValidToken)
+	ctx.Step(`^the mock GitHub API authenticated user is "([^"]*)"$`, theMockGitHubAPIAuthenticatedUserIs)
+	ctx.Step(`^the mock GitHub issue "([^"]*)" has the following comments:$`, theMockGitHubIssueHasTheFollowingComments)
+	ctx.Step(`^the JSON output array "([^"]*)" should have length (\d+)$`, theJSONOutputArrayShouldHaveLength)
 }
 
 // aFreshBacklogDirectory creates a new empty .backlog directory.
@@ -2435,4 +2438,82 @@ func theEnvironmentVariableIsSetToAValidToken(ctx context.Context, key string) (
 	}
 
 	return ctx, nil
+}
+
+// MockGitHubComment represents a comment on a GitHub issue.
+type MockGitHubComment struct {
+	Author string
+	Body   string
+}
+
+// mockGitHubCommentsKey is the context key for storing mock issue comments.
+const mockGitHubCommentsKey contextKey = "mockGitHubComments"
+
+// mockGitHubAuthenticatedUserKey is the context key for storing the mock authenticated user.
+const mockGitHubAuthenticatedUserKey contextKey = "mockGitHubAuthenticatedUser"
+
+// theMockGitHubAPIAuthenticatedUserIs sets the authenticated user for the mock GitHub API.
+func theMockGitHubAPIAuthenticatedUserIs(ctx context.Context, username string) (context.Context, error) {
+	ctx = context.WithValue(ctx, mockGitHubAuthenticatedUserKey, username)
+	return ctx, nil
+}
+
+// theMockGitHubIssueHasTheFollowingComments sets up mock comments for a specific GitHub issue.
+func theMockGitHubIssueHasTheFollowingComments(ctx context.Context, issueNumber string, table *godog.Table) (context.Context, error) {
+	if len(table.Rows) < 2 {
+		return ctx, fmt.Errorf("table must have at least a header row and one data row")
+	}
+
+	header := table.Rows[0]
+	colIndex := make(map[string]int)
+	for i, cell := range header.Cells {
+		colIndex[cell.Value] = i
+	}
+
+	var comments []MockGitHubComment
+	for _, row := range table.Rows[1:] {
+		getValue := func(col string) string {
+			if idx, ok := colIndex[col]; ok && idx < len(row.Cells) {
+				return row.Cells[idx].Value
+			}
+			return ""
+		}
+
+		comment := MockGitHubComment{
+			Author: getValue("author"),
+			Body:   getValue("body"),
+		}
+
+		comments = append(comments, comment)
+	}
+
+	// Store comments in a map keyed by issue number
+	commentsMap := make(map[string][]MockGitHubComment)
+	if existing, ok := ctx.Value(mockGitHubCommentsKey).(map[string][]MockGitHubComment); ok {
+		commentsMap = existing
+	}
+	commentsMap[issueNumber] = comments
+
+	ctx = context.WithValue(ctx, mockGitHubCommentsKey, commentsMap)
+	return ctx, nil
+}
+
+// theJSONOutputArrayShouldHaveLength verifies that a JSON array has the expected length.
+func theJSONOutputArrayShouldHaveLength(ctx context.Context, arrayPath string, expectedLength int) error {
+	result := getLastResult(ctx)
+	if result == nil {
+		return fmt.Errorf("no command has been run")
+	}
+
+	jsonResult := support.ParseJSON(result.Stdout)
+	if !jsonResult.Valid() {
+		return fmt.Errorf("stdout is not valid JSON: %s\nstdout:\n%s", jsonResult.Error(), result.Stdout)
+	}
+
+	length := jsonResult.ArrayLen(arrayPath)
+	if length != expectedLength {
+		return fmt.Errorf("expected JSON array %q to have length %d, got %d", arrayPath, expectedLength, length)
+	}
+
+	return nil
 }
