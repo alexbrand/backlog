@@ -21,7 +21,7 @@ This plan covers implementing a Gherkin-based executable specification using [go
 - [x] Implement CLI runner helper (executes `backlog` commands, captures stdout/stderr/exit code)
 - [x] Implement fixture loader for pre-built `.backlog/` directories
 - [x] Implement JSON output parser for structured assertions
-- [ ] Implement task file reader for verifying file state
+- [x] Implement task file reader for verifying file state
 - [ ] Implement config file generator for test workspaces
 
 ### Common Step Definitions
