@@ -17,6 +17,7 @@ func TestFeatures(t *testing.T) {
 		Paths:       []string{"features"},
 		Randomize:   0,
 		Concurrency: 1,
+		Tags:        "~@remote", // Exclude remote backend tests by default
 	}
 
 	suite := godog.TestSuite{

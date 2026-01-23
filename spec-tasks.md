@@ -158,12 +158,12 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 ## Phase 1d: Error Handling Specs
 
 ### Feature: Error Handling (`errors.feature`)
-- [ ] Scenario: Network error returns exit code 1
-- [ ] Scenario: Auth error returns exit code 1
-- [ ] Scenario: Not found returns exit code 3
-- [ ] Scenario: Config error returns exit code 4
-- [ ] Scenario: Error message goes to stderr
-- [ ] Scenario: JSON error format when --format=json
+- [x] Scenario: Network error returns exit code 1 (documented for remote backends with @remote tag)
+- [x] Scenario: Auth error returns exit code 1 (documented for remote backends with @remote tag)
+- [x] Scenario: Not found returns exit code 3
+- [x] Scenario: Config error returns exit code 4
+- [x] Scenario: Error message goes to stderr
+- [x] Scenario: JSON error format when --format=json
 
 ---
 
@@ -382,7 +382,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 | Phase 1: Local CRUD | Complete | 5 | 36 |
 | Phase 1b: Output Formats | Complete | 3 | 8 |
 | Phase 1c: Configuration | Complete | 2 | 16 |
-| Phase 1d: Error Handling | Not Started | 0 | 0 |
+| Phase 1d: Error Handling | Complete | 1 | 12 |
 | Phase 2: Agent Coordination | Not Started | 0 | 0 |
 | Phase 3: Git Sync | Not Started | 0 | 0 |
 | Phase 4: GitHub Issues | Not Started | 0 | 0 |
