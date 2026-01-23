@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	"github.com/alexbrand/backlog/internal/backend"
-	"github.com/alexbrand/backlog/internal/config"
-	"github.com/alexbrand/backlog/internal/local"
 	"github.com/alexbrand/backlog/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -44,60 +42,12 @@ func runMove(id, statusStr, comment string) error {
 		return InvalidInputError(fmt.Sprintf("invalid status %q (valid: backlog, todo, in-progress, review, done)", statusStr))
 	}
 
-	// Get backend and configuration
-	var b backend.Backend
-	var backendCfg backend.Config
-
-	// Try to get workspace from config
-	ws, _, err := config.GetWorkspace(GetWorkspace())
-	if err == nil {
-		// Have config - use it
-		b, err = backend.Get(ws.Backend)
-		if err != nil {
-			return err
-		}
-
-		cfg := config.Get()
-		backendCfg = backend.Config{
-			AgentID:          cfg.Defaults.AgentID,
-			AgentLabelPrefix: ws.AgentLabelPrefix,
-		}
-
-		switch ws.Backend {
-		case "local":
-			path := ws.Path
-			if path == "" {
-				path = ".backlog"
-			}
-			backendCfg.Workspace = &local.WorkspaceConfig{
-				Path:     path,
-				LockMode: local.LockMode(ws.LockMode),
-				GitSync:  ws.GitSync,
-			}
-		default:
-			return fmt.Errorf("unsupported backend: %s", ws.Backend)
-		}
-	} else {
-		// No config - check for local .backlog directory
-		if _, statErr := os.Stat(".backlog"); statErr == nil {
-			// Local .backlog directory exists - use local backend
-			b, err = backend.Get("local")
-			if err != nil {
-				return err
-			}
-			backendCfg = backend.Config{
-				Workspace: &local.WorkspaceConfig{Path: ".backlog"},
-			}
-		} else {
-			// No config and no local .backlog directory
-			return err
-		}
+	// Get backend and connect
+	b, _, cleanup, err := connectBackend()
+	if err != nil {
+		return err
 	}
-
-	if err := b.Connect(backendCfg); err != nil {
-		return fmt.Errorf("failed to connect to backend: %w", err)
-	}
-	defer b.Disconnect()
+	defer cleanup()
 
 	// Get the current task first to capture old status
 	currentTask, err := b.Get(id)

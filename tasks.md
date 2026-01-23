@@ -119,33 +119,36 @@
 
 ### GitHub Backend Implementation
 - [x] Create `internal/github/` package
-- [ ] Implement GitHub API client setup (go-github)
-- [ ] Implement `Connect()` with token authentication
-- [ ] Implement `HealthCheck()`
-- [ ] Implement `List()` — fetch issues with label filtering
-- [ ] Implement `Get()` — fetch single issue
-- [ ] Implement `Create()` — create issue
-- [ ] Implement `Update()` — update issue
-- [ ] Implement `Delete()` — close/delete issue
-- [ ] Implement `Move()` — update labels for status
+- [x] Implement GitHub API client setup (go-github)
+- [x] Implement `Connect()` with token authentication
+- [x] Implement `HealthCheck()`
+- [x] Implement `List()` — fetch issues with label filtering
+- [x] Implement `Get()` — fetch single issue
+- [x] Implement `Create()` — create issue
+- [x] Implement `Update()` — update issue
+- [x] Implement `Delete()` — close/delete issue
+- [x] Implement `Move()` — update labels for status
 
 ### Status Mapping
-- [ ] Implement default label-based status mapping
-- [ ] Implement configurable `status_map` in workspace config
-- [ ] Handle unknown statuses (map to `backlog` with warning)
+- [x] Implement default label-based status mapping
+- [x] Implement configurable `status_map` in workspace config
+- [x] Handle unknown statuses (map to `backlog` with warning)
 
 ### Agent Labels
-- [ ] Implement `agent:<agent_id>` label management
-- [ ] Implement claim via label + assignment
-- [ ] Implement release via label removal + unassignment
+- [x] Implement `agent:<agent_id>` label management
+- [x] Implement claim via label + assignment
+- [x] Implement release via label removal + unassignment
 
 ### Comments
-- [ ] Implement `ListComments()`
-- [ ] Implement `AddComment()`
+- [x] Implement `ListComments()`
+- [x] Implement `AddComment()`
+
+### CLI Integration
+- [x] Integrate GitHub backend into CLI commands via `backend_helper.go`
 
 ### Configuration
 - [ ] Implement `backlog config init` — interactive setup
-- [ ] Support `GITHUB_TOKEN` environment variable
+- [x] Support `GITHUB_TOKEN` environment variable
 - [ ] Support credentials.yaml for token storage
 
 ---
@@ -219,6 +222,6 @@
 | Phase 1: Local CRUD | Complete | All done |
 | Phase 2: Agent Coordination | Complete | All done |
 | Phase 3: Git Sync | Complete | All done |
-| Phase 4: GitHub Issues | Not Started | 0/X |
+| Phase 4: GitHub Issues | In Progress | Backend + CLI done, config init pending |
 | Phase 5: GitHub Projects | Not Started | 0/X |
 | Phase 6: Linear | Not Started | 0/X |
