@@ -86,6 +86,9 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^a task "([^"]*)" exists with status "([^"]*)"$`, aTaskExistsWithStatus)
 	ctx.Step(`^a task "([^"]*)" exists with priority "([^"]*)"$`, aTaskExistsWithPriority)
 	ctx.Step(`^a task "([^"]*)" exists with labels "([^"]*)"$`, aTaskExistsWithLabels)
+	ctx.Step(`^the environment variable "([^"]*)" is "([^"]*)"$`, theEnvironmentVariableIs)
+	ctx.Step(`^task "([^"]*)" is claimed by agent "([^"]*)"$`, taskIsClaimedByAgent)
+	ctx.Step(`^the agent ID is "([^"]*)"$`, theAgentIDIs)
 
 	// When steps
 	ctx.Step(`^I run "([^"]*)"$`, iRun)
@@ -129,6 +132,14 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the task "([^"]*)" should have comment containing "([^"]*)"$`, theTaskShouldHaveCommentContaining)
 	ctx.Step(`^the task "([^"]*)" should not have label "([^"]*)"$`, theTaskShouldNotHaveLabel)
 	ctx.Step(`^the task "([^"]*)" should have description containing "([^"]*)"$`, theTaskShouldHaveDescriptionContaining)
+
+	// Claim-specific verification steps
+	ctx.Step(`^the task "([^"]*)" should be assigned$`, theTaskShouldBeAssigned)
+	ctx.Step(`^the task "([^"]*)" should have agent label$`, theTaskShouldHaveAgentLabel)
+	ctx.Step(`^a lock file should exist for task "([^"]*)"$`, aLockFileShouldExistForTask)
+	ctx.Step(`^no lock file should exist for task "([^"]*)"$`, noLockFileShouldExistForTask)
+	ctx.Step(`^task "([^"]*)" should be claimed by "([^"]*)"$`, taskShouldBeClaimedBy)
+	ctx.Step(`^task "([^"]*)" should not be claimed$`, taskShouldNotBeClaimed)
 }
 
 // aFreshBacklogDirectory creates a new empty .backlog directory.
@@ -1061,4 +1072,186 @@ func theConfigFileIsRemoved(ctx context.Context) (context.Context, error) {
 	}
 
 	return ctx, nil
+}
+
+// theEnvironmentVariableIs sets an environment variable for the test.
+func theEnvironmentVariableIs(ctx context.Context, key, value string) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	env.SetEnv(key, value)
+	return ctx, nil
+}
+
+// taskIsClaimedByAgent sets up a task as claimed by a specific agent.
+func taskIsClaimedByAgent(ctx context.Context, taskID, agentID string) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	// Read the task file
+	reader := support.NewTaskFileReader(env.Path(".backlog"))
+	task := reader.ReadTask(taskID)
+	if task.ParseErr != nil {
+		return ctx, fmt.Errorf("failed to read task %s: %w", taskID, task.ParseErr)
+	}
+
+	// Read the file content
+	content, err := os.ReadFile(task.Path)
+	if err != nil {
+		return ctx, fmt.Errorf("failed to read task file: %w", err)
+	}
+
+	// Add agent_id to frontmatter if not present
+	contentStr := string(content)
+	if !strings.Contains(contentStr, "agent_id:") {
+		// Insert agent_id before the closing ---
+		contentStr = strings.Replace(contentStr, "\n---\n", fmt.Sprintf("\nagent_id: %s\n---\n", agentID), 1)
+	}
+
+	// Add agent label if not present
+	agentLabel := fmt.Sprintf("agent:%s", agentID)
+	if !strings.Contains(contentStr, agentLabel) {
+		// Update the labels line
+		if strings.Contains(contentStr, "labels: []") {
+			contentStr = strings.Replace(contentStr, "labels: []", fmt.Sprintf("labels: [%s]", agentLabel), 1)
+		} else if strings.Contains(contentStr, "labels: [") {
+			// Add to existing labels
+			contentStr = strings.Replace(contentStr, "labels: [", fmt.Sprintf("labels: [%s, ", agentLabel), 1)
+		}
+	}
+
+	if err := os.WriteFile(task.Path, []byte(contentStr), 0644); err != nil {
+		return ctx, fmt.Errorf("failed to write task file: %w", err)
+	}
+
+	// Create lock file
+	lockContent := fmt.Sprintf("agent: %s\nclaimed_at: 2025-01-01T00:00:00Z\nexpires_at: 2025-01-01T00:30:00Z\n", agentID)
+	lockPath := filepath.Join(".backlog", ".locks", taskID+".lock")
+	if err := env.CreateFile(lockPath, lockContent); err != nil {
+		return ctx, fmt.Errorf("failed to create lock file: %w", err)
+	}
+
+	return ctx, nil
+}
+
+// theAgentIDIs is an alias for setting BACKLOG_AGENT_ID environment variable.
+func theAgentIDIs(ctx context.Context, agentID string) (context.Context, error) {
+	return theEnvironmentVariableIs(ctx, "BACKLOG_AGENT_ID", agentID)
+}
+
+// theTaskShouldBeAssigned verifies that a task has an assignee set.
+func theTaskShouldBeAssigned(ctx context.Context, taskID string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	reader := support.NewTaskFileReader(env.Path(".backlog"))
+	task := reader.ReadTask(taskID)
+	if task.ParseErr != nil {
+		return fmt.Errorf("failed to read task %s: %w", taskID, task.ParseErr)
+	}
+
+	if !task.IsAssigned() {
+		return fmt.Errorf("expected task %s to be assigned, but assignee is %q", taskID, task.Assignee)
+	}
+
+	return nil
+}
+
+// theTaskShouldHaveAgentLabel verifies that a task has an agent label (agent:*).
+func theTaskShouldHaveAgentLabel(ctx context.Context, taskID string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	reader := support.NewTaskFileReader(env.Path(".backlog"))
+	task := reader.ReadTask(taskID)
+	if task.ParseErr != nil {
+		return fmt.Errorf("failed to read task %s: %w", taskID, task.ParseErr)
+	}
+
+	if !task.HasAgentLabel("agent") {
+		return fmt.Errorf("expected task %s to have an agent label, but it has labels: %v", taskID, task.Labels)
+	}
+
+	return nil
+}
+
+// aLockFileShouldExistForTask verifies that a lock file exists for the task.
+func aLockFileShouldExistForTask(ctx context.Context, taskID string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	lockPath := filepath.Join(".backlog", ".locks", taskID+".lock")
+	if !env.FileExists(lockPath) {
+		return fmt.Errorf("expected lock file %s to exist, but it doesn't", lockPath)
+	}
+
+	return nil
+}
+
+// noLockFileShouldExistForTask verifies that no lock file exists for the task.
+func noLockFileShouldExistForTask(ctx context.Context, taskID string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	lockPath := filepath.Join(".backlog", ".locks", taskID+".lock")
+	if env.FileExists(lockPath) {
+		return fmt.Errorf("expected no lock file at %s, but it exists", lockPath)
+	}
+
+	return nil
+}
+
+// taskShouldBeClaimedBy verifies that a task is claimed by a specific agent.
+func taskShouldBeClaimedBy(ctx context.Context, taskID, agentID string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	reader := support.NewTaskFileReader(env.Path(".backlog"))
+	task := reader.ReadTask(taskID)
+	if task.ParseErr != nil {
+		return fmt.Errorf("failed to read task %s: %w", taskID, task.ParseErr)
+	}
+
+	expectedLabel := fmt.Sprintf("agent:%s", agentID)
+	if !task.HasLabel(expectedLabel) {
+		return fmt.Errorf("expected task %s to be claimed by %s (have label %s), but it has labels: %v",
+			taskID, agentID, expectedLabel, task.Labels)
+	}
+
+	return nil
+}
+
+// taskShouldNotBeClaimed verifies that a task is not claimed by any agent.
+func taskShouldNotBeClaimed(ctx context.Context, taskID string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	reader := support.NewTaskFileReader(env.Path(".backlog"))
+	task := reader.ReadTask(taskID)
+	if task.ParseErr != nil {
+		return fmt.Errorf("failed to read task %s: %w", taskID, task.ParseErr)
+	}
+
+	if task.HasAgentLabel("agent") {
+		agentID := task.GetAgentFromLabel("agent")
+		return fmt.Errorf("expected task %s to not be claimed, but it is claimed by %s", taskID, agentID)
+	}
+
+	return nil
 }

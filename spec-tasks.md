@@ -170,19 +170,19 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 ## Phase 2: Local Backend — Agent Coordination Specs
 
 ### Feature: Claiming Tasks (`claim.feature`)
-- [ ] Scenario: Claim unclaimed task succeeds
-- [ ] Scenario: Claim adds agent label to task
-- [ ] Scenario: Claim moves task to in-progress
-- [ ] Scenario: Claim assigns to authenticated user
-- [ ] Scenario: Claim already-claimed task by same agent is no-op (exit 0)
-- [ ] Scenario: Claim task claimed by different agent returns exit code 2
-- [ ] Scenario: Claim with explicit agent-id flag
-- [ ] Scenario: Claim uses BACKLOG_AGENT_ID environment variable
-- [ ] Scenario: Claim uses workspace config agent_id
-- [ ] Scenario: Claim uses global default agent_id
-- [ ] Scenario: Claim falls back to hostname
-- [ ] Scenario: Claim creates lock file (file mode)
-- [ ] Scenario: Claim non-existent task returns exit code 3
+- [x] Scenario: Claim unclaimed task succeeds
+- [x] Scenario: Claim adds agent label to task
+- [x] Scenario: Claim moves task to in-progress
+- [x] Scenario: Claim assigns to authenticated user
+- [x] Scenario: Claim already-claimed task by same agent is no-op (exit 0)
+- [x] Scenario: Claim task claimed by different agent returns exit code 2
+- [x] Scenario: Claim with explicit agent-id flag
+- [x] Scenario: Claim uses BACKLOG_AGENT_ID environment variable
+- [x] Scenario: Claim uses workspace config agent_id
+- [x] Scenario: Claim uses global default agent_id
+- [x] Scenario: Claim falls back to hostname
+- [x] Scenario: Claim creates lock file (file mode)
+- [x] Scenario: Claim non-existent task returns exit code 3
 
 ### Feature: Releasing Tasks (`release.feature`)
 - [ ] Scenario: Release claimed task succeeds
@@ -217,13 +217,13 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [ ] Scenario: Concurrent claim attempts — one wins, one fails
 
 ### Step Definitions - Phase 2
-- [ ] Implement "Given task {string} is claimed by agent {string}"
-- [ ] Implement "Given the agent ID is {string}"
-- [ ] Implement "Given the environment variable {string} is {string}"
-- [ ] Implement "Then task {string} should be claimed by {string}"
-- [ ] Implement "Then task {string} should not be claimed"
-- [ ] Implement "Then a lock file should exist for {string}"
-- [ ] Implement "Then no lock file should exist for {string}"
+- [x] Implement "Given task {string} is claimed by agent {string}"
+- [x] Implement "Given the agent ID is {string}"
+- [x] Implement "Given the environment variable {string} is {string}"
+- [x] Implement "Then task {string} should be claimed by {string}"
+- [x] Implement "Then task {string} should not be claimed"
+- [x] Implement "Then a lock file should exist for {string}"
+- [x] Implement "Then no lock file should exist for {string}"
 
 ---
 
@@ -383,7 +383,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 | Phase 1b: Output Formats | Complete | 3 | 8 |
 | Phase 1c: Configuration | Complete | 2 | 16 |
 | Phase 1d: Error Handling | Complete | 1 | 12 |
-| Phase 2: Agent Coordination | Not Started | 0 | 0 |
+| Phase 2: Agent Coordination | In Progress | 1 | 14 |
 | Phase 3: Git Sync | Not Started | 0 | 0 |
 | Phase 4: GitHub Issues | Not Started | 0 | 0 |
 | Phase 5: GitHub Projects | Not Started | 0 | 0 |
