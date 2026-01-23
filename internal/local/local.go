@@ -24,18 +24,31 @@ const (
 	Name = "local"
 )
 
+// LockMode represents the locking strategy for multi-agent coordination.
+type LockMode string
+
+const (
+	// LockModeFile uses file-based locking (default).
+	LockModeFile LockMode = "file"
+	// LockModeGit uses git-based locking (requires git_sync: true).
+	LockModeGit LockMode = "git"
+)
+
 // WorkspaceConfig holds local backend-specific workspace configuration.
 type WorkspaceConfig struct {
 	// Path is the path to the .backlog directory.
 	Path string
+	// LockMode specifies the locking strategy: "file" (default) or "git".
+	LockMode LockMode
 }
 
 // Local implements the Backend interface using the local filesystem.
 type Local struct {
-	path            string
-	agentID         string
+	path             string
+	agentID          string
 	agentLabelPrefix string
-	connected       bool
+	lockMode         LockMode
+	connected        bool
 }
 
 // New creates a new Local backend instance.
@@ -65,6 +78,12 @@ func (l *Local) Connect(cfg backend.Config) error {
 	l.agentLabelPrefix = cfg.AgentLabelPrefix
 	if l.agentLabelPrefix == "" {
 		l.agentLabelPrefix = "agent"
+	}
+
+	// Set lock mode, defaulting to file-based locking
+	l.lockMode = wsCfg.LockMode
+	if l.lockMode == "" {
+		l.lockMode = LockModeFile
 	}
 
 	// Verify the .backlog directory exists

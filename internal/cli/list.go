@@ -110,7 +110,10 @@ func runList() error {
 			if path == "" {
 				path = ".backlog"
 			}
-			backendCfg.Workspace = &local.WorkspaceConfig{Path: path}
+			backendCfg.Workspace = &local.WorkspaceConfig{
+				Path:     path,
+				LockMode: local.LockMode(ws.LockMode),
+			}
 		default:
 			return fmt.Errorf("unsupported backend: %s", ws.Backend)
 		}

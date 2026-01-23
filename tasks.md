@@ -76,7 +76,7 @@
 - [x] Implement lock acquisition (atomic file creation) — `Claim()` method
 - [x] Implement lock release — `Release()` method
 - [x] Implement stale lock detection (TTL expiry) — `isActive()` method with 30-min default TTL
-- [ ] Add `lock_mode: file` config option
+- [x] Add `lock_mode: file` config option
 
 ### CLI Commands - Phase 2
 - [ ] Implement `backlog claim <id>` — acquire lock, add agent label to frontmatter, move to `in-progress`
