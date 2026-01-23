@@ -132,3 +132,19 @@ Feature: Listing Tasks
     And stdout should not contain "Third task"
     And stdout should not contain "Fourth task"
     And stdout should not contain "Fifth task"
+
+  Scenario: List with priority filter
+    Given a backlog with the following tasks:
+      | id    | title           | status      | priority |
+      | task1 | First task      | todo        | high     |
+      | task2 | Second task     | in-progress | medium   |
+      | task3 | Third task      | backlog     | low      |
+      | task4 | Fourth task     | todo        | urgent   |
+      | task5 | Fifth task      | review      | none     |
+    When I run "backlog list --priority=high"
+    Then the exit code should be 0
+    And stdout should contain "First task"
+    And stdout should not contain "Second task"
+    And stdout should not contain "Third task"
+    And stdout should not contain "Fourth task"
+    And stdout should not contain "Fifth task"
