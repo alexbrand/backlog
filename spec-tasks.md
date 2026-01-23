@@ -253,11 +253,11 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 ## Phase 4: GitHub Backend — Issues Specs
 
 ### Feature: GitHub Connection (`github_connect.feature`)
-- [ ] Scenario: Connect with valid token succeeds
-- [ ] Scenario: Connect with invalid token returns exit code 1
-- [ ] Scenario: Health check passes with valid connection
-- [ ] Scenario: Uses GITHUB_TOKEN environment variable
-- [ ] Scenario: Uses credentials.yaml token
+- [x] Scenario: Connect with valid token succeeds
+- [x] Scenario: Connect with invalid token returns exit code 1
+- [x] Scenario: Health check passes with valid connection
+- [x] Scenario: Uses GITHUB_TOKEN environment variable
+- [x] Scenario: Uses credentials.yaml token
 
 ### Feature: GitHub List (`github_list.feature`)
 - [ ] Scenario: List fetches issues from repository
@@ -385,7 +385,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 | Phase 1d: Error Handling | Complete | 1 | 12 |
 | Phase 2: Agent Coordination | Complete | 5 | 46 |
 | Phase 3: Git Sync | Complete | 2 | 19 |
-| Phase 4: GitHub Issues | Not Started | 0 | 0 |
+| Phase 4: GitHub Issues | In Progress | 1 | 10 |
 | Phase 5: GitHub Projects | Not Started | 0 | 0 |
 | Phase 6: Linear | Not Started | 0 | 0 |
 | Cross-Cutting | Not Started | 0 | 0 |
