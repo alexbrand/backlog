@@ -2,7 +2,9 @@
 
 ## Overview
 
-This plan covers implementing a Gherkin-based executable specification using [godog](https://github.com/cucumber/godog) to verify the backlog CLI is built to spec.
+This task list tracks the creation of a Gherkin-based executable specification using [godog](https://github.com/cucumber/godog). The goal is to build a complete spec that defines the expected behavior of the backlog CLI.
+
+Once the spec is in place, it will serve as the foundation for TDD-based implementation: write the feature scenarios first, then implement the code to make them pass. This "spec-first" approach ensures that implementation is driven by clearly defined, testable requirements rather than ad-hoc development.
 
 ---
 
