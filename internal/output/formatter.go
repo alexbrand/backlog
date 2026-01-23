@@ -61,6 +61,9 @@ type Formatter interface {
 	// FormatReleased outputs the result of releasing a task.
 	FormatReleased(w io.Writer, task *backend.Task) error
 
+	// FormatSynced outputs the result of a sync operation.
+	FormatSynced(w io.Writer, result *backend.SyncResult) error
+
 	// FormatError outputs an error.
 	FormatError(w io.Writer, code string, message string, details map[string]any) error
 }

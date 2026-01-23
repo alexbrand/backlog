@@ -151,6 +151,32 @@ func (f *TableFormatter) FormatReleased(w io.Writer, task *backend.Task) error {
 	return nil
 }
 
+// FormatSynced outputs the result of a sync operation.
+func (f *TableFormatter) FormatSynced(w io.Writer, result *backend.SyncResult) error {
+	if result.Updated == 0 && result.Pushed == 0 && result.Created == 0 && result.Deleted == 0 {
+		fmt.Fprintln(w, "Already up to date.")
+		return nil
+	}
+
+	fmt.Fprintln(w, "Sync complete:")
+	if result.Created > 0 {
+		fmt.Fprintf(w, "  Created: %d\n", result.Created)
+	}
+	if result.Updated > 0 {
+		fmt.Fprintf(w, "  Updated: %d\n", result.Updated)
+	}
+	if result.Deleted > 0 {
+		fmt.Fprintf(w, "  Deleted: %d\n", result.Deleted)
+	}
+	if result.Pushed > 0 {
+		fmt.Fprintf(w, "  Pushed:  %d\n", result.Pushed)
+	}
+	if result.Conflicts > 0 {
+		fmt.Fprintf(w, "  Conflicts: %d\n", result.Conflicts)
+	}
+	return nil
+}
+
 // FormatError outputs an error message.
 func (f *TableFormatter) FormatError(w io.Writer, code string, message string, details map[string]any) error {
 	fmt.Fprintf(w, "error: %s\n", message)

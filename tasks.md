@@ -105,9 +105,9 @@
 - [x] Implement commit message format (`action: id-title [agent:id]`)
 
 ### Sync Command
-- [ ] Implement `backlog sync` — pull, push
-- [ ] Implement `backlog sync --force`
-- [ ] Implement conflict detection via failed push (exit code 2)
+- [x] Implement `backlog sync` — pull, push
+- [x] Implement `backlog sync --force`
+- [x] Implement conflict detection via failed push (exit code 2)
 
 ### Git-Based Claims
 - [ ] Implement claim via pull → commit → push
@@ -218,7 +218,7 @@
 |-------|--------|-------|
 | Phase 1: Local CRUD | Complete | All done |
 | Phase 2: Agent Coordination | Complete | All done |
-| Phase 3: Git Sync | Not Started | 0/X |
+| Phase 3: Git Sync | In Progress | 7/9 |
 | Phase 4: GitHub Issues | Not Started | 0/X |
 | Phase 5: GitHub Projects | Not Started | 0/X |
 | Phase 6: Linear | Not Started | 0/X |

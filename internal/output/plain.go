@@ -72,6 +72,13 @@ func (f *PlainFormatter) FormatReleased(w io.Writer, task *backend.Task) error {
 	return nil
 }
 
+// FormatSynced outputs the result of a sync operation in plain format.
+func (f *PlainFormatter) FormatSynced(w io.Writer, result *backend.SyncResult) error {
+	fmt.Fprintf(w, "%d\t%d\t%d\t%d\t%d\n",
+		result.Created, result.Updated, result.Deleted, result.Pushed, result.Conflicts)
+	return nil
+}
+
 // FormatError outputs an error in plain format.
 func (f *PlainFormatter) FormatError(w io.Writer, code string, message string, details map[string]any) error {
 	fmt.Fprintf(w, "error: %s\n", message)

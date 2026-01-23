@@ -82,6 +82,17 @@ func (f *JSONFormatter) FormatReleased(w io.Writer, task *backend.Task) error {
 	})
 }
 
+// FormatSynced outputs the result of a sync operation as JSON.
+func (f *JSONFormatter) FormatSynced(w io.Writer, result *backend.SyncResult) error {
+	return f.writeJSON(w, map[string]any{
+		"created":   result.Created,
+		"updated":   result.Updated,
+		"deleted":   result.Deleted,
+		"pushed":    result.Pushed,
+		"conflicts": result.Conflicts,
+	})
+}
+
 // FormatError outputs an error as JSON.
 func (f *JSONFormatter) FormatError(w io.Writer, code string, message string, details map[string]any) error {
 	errObj := map[string]any{

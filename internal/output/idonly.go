@@ -68,6 +68,13 @@ func (f *IDOnlyFormatter) FormatReleased(w io.Writer, task *backend.Task) error 
 	return nil
 }
 
+// FormatSynced outputs sync result counts.
+func (f *IDOnlyFormatter) FormatSynced(w io.Writer, result *backend.SyncResult) error {
+	// For id-only format, just output pushed count (most relevant number)
+	fmt.Fprintf(w, "%d\n", result.Pushed)
+	return nil
+}
+
 // FormatError outputs an error message (errors are always shown).
 func (f *IDOnlyFormatter) FormatError(w io.Writer, code string, message string, details map[string]any) error {
 	fmt.Fprintf(w, "error: %s\n", message)

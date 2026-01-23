@@ -893,6 +893,95 @@ func (l *Local) gitCommit(action, taskID string) error {
 	return nil
 }
 
+// Sync synchronizes the local backlog with a remote git repository.
+// Implements the backend.Syncer interface.
+func (l *Local) Sync(force bool) (*backend.SyncResult, error) {
+	if !l.connected {
+		return nil, errors.New("not connected")
+	}
+
+	// Get the parent directory of the .backlog folder to run git commands
+	gitDir := filepath.Dir(l.path)
+
+	result := &backend.SyncResult{}
+
+	// First, pull changes from remote
+	pullArgs := []string{"pull"}
+	if force {
+		pullArgs = append(pullArgs, "--rebase")
+	}
+	pullCmd := exec.Command("git", pullArgs...)
+	pullCmd.Dir = gitDir
+	pullOutput, err := pullCmd.CombinedOutput()
+	if err != nil {
+		// Check for conflicts
+		outputStr := string(pullOutput)
+		if strings.Contains(outputStr, "CONFLICT") || strings.Contains(outputStr, "conflict") {
+			return nil, &SyncConflictError{
+				Operation: "pull",
+				Message:   outputStr,
+			}
+		}
+		// Check if it's just "already up to date"
+		if !strings.Contains(outputStr, "Already up to date") &&
+			!strings.Contains(outputStr, "Already up-to-date") {
+			return nil, fmt.Errorf("git pull failed: %w\n%s", err, outputStr)
+		}
+	}
+
+	// Parse pull output to count changes
+	pullOutputStr := string(pullOutput)
+	if strings.Contains(pullOutputStr, "files changed") ||
+		strings.Contains(pullOutputStr, "file changed") {
+		// Some changes were pulled
+		result.Updated = 1 // Simplified: we don't parse exact counts
+	}
+
+	// Then, push local changes to remote
+	pushArgs := []string{"push"}
+	if force {
+		pushArgs = append(pushArgs, "--force")
+	}
+	pushCmd := exec.Command("git", pushArgs...)
+	pushCmd.Dir = gitDir
+	pushOutput, err := pushCmd.CombinedOutput()
+	if err != nil {
+		outputStr := string(pushOutput)
+		// Check for conflicts or rejection
+		if strings.Contains(outputStr, "rejected") ||
+			strings.Contains(outputStr, "non-fast-forward") {
+			return nil, &SyncConflictError{
+				Operation: "push",
+				Message:   "push rejected - remote has changes. Use --force to overwrite or pull first",
+			}
+		}
+		// Check if there's nothing to push
+		if !strings.Contains(outputStr, "Everything up-to-date") &&
+			!strings.Contains(outputStr, "nothing to commit") {
+			return nil, fmt.Errorf("git push failed: %w\n%s", err, outputStr)
+		}
+	}
+
+	// Parse push output
+	pushOutputStr := string(pushOutput)
+	if !strings.Contains(pushOutputStr, "Everything up-to-date") &&
+		!strings.Contains(pushOutputStr, "up-to-date") {
+		result.Pushed = 1 // Simplified: we don't parse exact counts
+	}
+
+	return result, nil
+}
+
+// SyncConflictError represents a conflict during sync operation.
+type SyncConflictError struct {
+	Operation string
+	Message   string
+}
+
+func (e *SyncConflictError) Error() string {
+	return fmt.Sprintf("sync conflict during %s: %s", e.Operation, e.Message)
+}
+
 // Register registers the local backend with the registry.
 func Register() {
 	backend.Register(Name, func() backend.Backend {
