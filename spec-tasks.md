@@ -148,10 +148,10 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: Invalid config file returns exit code 4
 
 ### Feature: Global Flags (`global_flags.feature`)
-- [ ] Scenario: Quiet flag suppresses non-essential output
-- [ ] Scenario: Verbose flag shows debug information
-- [ ] Scenario: Format flag changes output format
-- [ ] Scenario: Workspace flag selects workspace
+- [x] Scenario: Quiet flag suppresses non-essential output
+- [x] Scenario: Verbose flag shows debug information
+- [x] Scenario: Format flag changes output format
+- [x] Scenario: Workspace flag selects workspace
 
 ---
 
@@ -381,7 +381,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 | Phase 0: Infrastructure | Complete | 0 | 0 |
 | Phase 1: Local CRUD | Complete | 5 | 36 |
 | Phase 1b: Output Formats | Complete | 3 | 8 |
-| Phase 1c: Configuration | Complete | 1 | 5 |
+| Phase 1c: Configuration | Complete | 2 | 16 |
 | Phase 1d: Error Handling | Not Started | 0 | 0 |
 | Phase 2: Agent Coordination | Not Started | 0 | 0 |
 | Phase 3: Git Sync | Not Started | 0 | 0 |
