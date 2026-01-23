@@ -205,10 +205,10 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: Next in JSON format
 
 ### Feature: Comments (`comment.feature`)
-- [ ] Scenario: Add comment to task
-- [ ] Scenario: Add comment with body-file
-- [ ] Scenario: Comment appears in task file
-- [ ] Scenario: Comment on non-existent task returns exit code 3
+- [x] Scenario: Add comment to task
+- [x] Scenario: Add comment with body-file
+- [x] Scenario: Comment appears in task file
+- [x] Scenario: Comment on non-existent task returns exit code 3
 
 ### Feature: File Locking (`locking.feature`)
 - [ ] Scenario: Lock file contains agent and timestamps
@@ -383,7 +383,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 | Phase 1b: Output Formats | Complete | 3 | 8 |
 | Phase 1c: Configuration | Complete | 2 | 16 |
 | Phase 1d: Error Handling | Complete | 1 | 12 |
-| Phase 2: Agent Coordination | In Progress | 3 | 34 |
+| Phase 2: Agent Coordination | In Progress | 4 | 42 |
 | Phase 3: Git Sync | Not Started | 0 | 0 |
 | Phase 4: GitHub Issues | Not Started | 0 | 0 |
 | Phase 5: GitHub Projects | Not Started | 0 | 0 |
