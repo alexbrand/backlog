@@ -103,9 +103,9 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: Edit preserves unmodified fields
 
 ### Step Definitions - Phase 1
-- [ ] Implement "Given a task {string} exists with status {string}"
-- [ ] Implement "Given a task {string} exists with priority {string}"
-- [ ] Implement "Given a task {string} exists with labels {string}"
+- [x] Implement "Given a task {string} exists with status {string}"
+- [x] Implement "Given a task {string} exists with priority {string}"
+- [x] Implement "Given a task {string} exists with labels {string}"
 - [x] Implement "Then a task file should exist in {string} directory"
 - [x] Implement "Then the task {string} should have status {string}"
 - [x] Implement "Then the created task should have priority {string}"

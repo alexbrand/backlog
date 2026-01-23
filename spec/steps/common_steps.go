@@ -83,6 +83,9 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^a fresh backlog directory$`, aFreshBacklogDirectory)
 	ctx.Step(`^a backlog with the following tasks:$`, aBacklogWithTheFollowingTasks)
 	ctx.Step(`^a file "([^"]*)" with content "([^"]*)"$`, aFileWithContent)
+	ctx.Step(`^a task "([^"]*)" exists with status "([^"]*)"$`, aTaskExistsWithStatus)
+	ctx.Step(`^a task "([^"]*)" exists with priority "([^"]*)"$`, aTaskExistsWithPriority)
+	ctx.Step(`^a task "([^"]*)" exists with labels "([^"]*)"$`, aTaskExistsWithLabels)
 
 	// When steps
 	ctx.Step(`^I run "([^"]*)"$`, iRun)
@@ -892,4 +895,130 @@ func theTaskShouldHaveDescriptionContaining(ctx context.Context, taskID, expecte
 	}
 
 	return nil
+}
+
+// aTaskExistsWithStatus creates a task with the given title and status.
+func aTaskExistsWithStatus(ctx context.Context, title, status string) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	// Ensure backlog directory exists
+	if !env.FileExists(".backlog") {
+		if err := env.CreateBacklogDir(); err != nil {
+			return ctx, fmt.Errorf("failed to create backlog directory: %w", err)
+		}
+	}
+
+	// Generate a simple ID from the title
+	id := generateTaskID(title)
+
+	loader := support.NewFixtureLoader("")
+	task := support.TaskFixture{
+		ID:     id,
+		Title:  title,
+		Status: status,
+	}
+
+	if err := loader.LoadTasks(env, []support.TaskFixture{task}); err != nil {
+		return ctx, fmt.Errorf("failed to create task: %w", err)
+	}
+
+	return ctx, nil
+}
+
+// aTaskExistsWithPriority creates a task with the given title and priority.
+func aTaskExistsWithPriority(ctx context.Context, title, priority string) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	// Ensure backlog directory exists
+	if !env.FileExists(".backlog") {
+		if err := env.CreateBacklogDir(); err != nil {
+			return ctx, fmt.Errorf("failed to create backlog directory: %w", err)
+		}
+	}
+
+	// Generate a simple ID from the title
+	id := generateTaskID(title)
+
+	loader := support.NewFixtureLoader("")
+	task := support.TaskFixture{
+		ID:       id,
+		Title:    title,
+		Status:   "backlog",
+		Priority: priority,
+	}
+
+	if err := loader.LoadTasks(env, []support.TaskFixture{task}); err != nil {
+		return ctx, fmt.Errorf("failed to create task: %w", err)
+	}
+
+	return ctx, nil
+}
+
+// aTaskExistsWithLabels creates a task with the given title and labels.
+func aTaskExistsWithLabels(ctx context.Context, title, labelsStr string) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	// Ensure backlog directory exists
+	if !env.FileExists(".backlog") {
+		if err := env.CreateBacklogDir(); err != nil {
+			return ctx, fmt.Errorf("failed to create backlog directory: %w", err)
+		}
+	}
+
+	// Generate a simple ID from the title
+	id := generateTaskID(title)
+
+	// Parse labels as comma-separated list
+	var labels []string
+	for _, label := range strings.Split(labelsStr, ",") {
+		label = strings.TrimSpace(label)
+		if label != "" {
+			labels = append(labels, label)
+		}
+	}
+
+	loader := support.NewFixtureLoader("")
+	task := support.TaskFixture{
+		ID:     id,
+		Title:  title,
+		Status: "backlog",
+		Labels: labels,
+	}
+
+	if err := loader.LoadTasks(env, []support.TaskFixture{task}); err != nil {
+		return ctx, fmt.Errorf("failed to create task: %w", err)
+	}
+
+	return ctx, nil
+}
+
+// generateTaskID generates a simple task ID from the title.
+func generateTaskID(title string) string {
+	// Create a slug from the title - take first few words, lowercase, replace spaces with dashes
+	slug := strings.ToLower(title)
+	slug = strings.ReplaceAll(slug, " ", "-")
+	// Remove non-alphanumeric characters except dashes
+	var result strings.Builder
+	for _, r := range slug {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+			result.WriteRune(r)
+		}
+	}
+	slug = result.String()
+	// Truncate if too long
+	if len(slug) > 20 {
+		slug = slug[:20]
+	}
+	// Remove trailing dashes
+	slug = strings.TrimRight(slug, "-")
+	return slug
 }
