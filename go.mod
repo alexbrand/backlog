@@ -2,7 +2,10 @@ module github.com/alexbrand/backlog
 
 go 1.25.6
 
-require github.com/cucumber/godog v0.15.1
+require (
+	github.com/cucumber/godog v0.15.1
+	gopkg.in/yaml.v3 v3.0.1
+)
 
 require (
 	github.com/cucumber/gherkin/go/v26 v26.2.0 // indirect
