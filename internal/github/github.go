@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -139,6 +140,19 @@ func (g *GitHub) Connect(cfg backend.Config) error {
 	tc := oauth2.NewClient(g.ctx, ts)
 	g.client = gh.NewClient(tc)
 
+	// Check for GITHUB_API_URL environment variable for testing/enterprise
+	if apiURL := os.Getenv("GITHUB_API_URL"); apiURL != "" {
+		baseURL := apiURL
+		if !strings.HasSuffix(baseURL, "/") {
+			baseURL += "/"
+		}
+		var err error
+		g.client, err = g.client.WithEnterpriseURLs(baseURL, baseURL)
+		if err != nil {
+			return fmt.Errorf("failed to set GitHub API URL: %w", err)
+		}
+	}
+
 	// Initialize Projects v2 client if project is configured
 	if wsCfg.Project > 0 {
 		statusFieldName := wsCfg.StatusField
@@ -244,7 +258,8 @@ func (g *GitHub) List(filters backend.TaskFilters) (*backend.TaskList, error) {
 		return nil, fmt.Errorf("failed to list issues: %w", err)
 	}
 
-	var tasks []backend.Task
+	// Initialize as empty slice (not nil) so JSON encoding produces [] not null
+	tasks := []backend.Task{}
 	for _, issue := range issues {
 		// Skip pull requests (GitHub API returns them as issues too)
 		if issue.IsPullRequest() {

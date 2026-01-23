@@ -147,7 +147,8 @@ func (l *Local) List(filters backend.TaskFilters) (*backend.TaskList, error) {
 		return nil, errors.New("not connected")
 	}
 
-	var tasks []backend.Task
+	// Initialize as empty slice (not nil) so JSON encoding produces [] not null
+	tasks := []backend.Task{}
 
 	// Determine which status directories to scan
 	statusDirs := []backend.Status{

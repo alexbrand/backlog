@@ -248,6 +248,13 @@ func aBacklogWithTheFollowingTasks(ctx context.Context, table *godog.Table) (con
 		return ctx, fmt.Errorf("test environment not initialized")
 	}
 
+	// Preserve config.yaml if it exists before clearing the backlog directory
+	var configContent []byte
+	configPath := env.Path(".backlog/config.yaml")
+	if data, err := os.ReadFile(configPath); err == nil {
+		configContent = data
+	}
+
 	// Clear existing backlog directory if it exists (to support overriding in scenarios)
 	if env.FileExists(".backlog") {
 		if err := os.RemoveAll(env.Path(".backlog")); err != nil {
@@ -258,6 +265,13 @@ func aBacklogWithTheFollowingTasks(ctx context.Context, table *godog.Table) (con
 	// Create backlog directory
 	if err := env.CreateBacklogDir(); err != nil {
 		return ctx, fmt.Errorf("failed to create backlog directory: %w", err)
+	}
+
+	// Restore config.yaml if it existed
+	if configContent != nil {
+		if err := os.WriteFile(configPath, configContent, 0644); err != nil {
+			return ctx, fmt.Errorf("failed to restore config file: %w", err)
+		}
 	}
 
 	// Parse table header to get column indices
@@ -2837,7 +2851,8 @@ func aMockLinearAPIServerIsRunning(ctx context.Context) (context.Context, error)
 	server := support.NewMockLinearServer()
 
 	// Set the LINEAR_API_URL environment variable to point to the mock server
-	env.SetEnv("LINEAR_API_URL", server.URL)
+	// The URL must include the /graphql path since that's what the Linear backend expects
+	env.SetEnv("LINEAR_API_URL", server.URL+"/graphql")
 
 	// Store the server in context for cleanup and configuration
 	ctx = context.WithValue(ctx, mockLinearServerKey, server)

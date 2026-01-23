@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -24,8 +25,8 @@ const (
 	// Name is the name of the Linear backend.
 	Name = "linear"
 
-	// linearAPIEndpoint is the Linear GraphQL API endpoint.
-	linearAPIEndpoint = "https://api.linear.app/graphql"
+	// defaultLinearAPIEndpoint is the default Linear GraphQL API endpoint.
+	defaultLinearAPIEndpoint = "https://api.linear.app/graphql"
 )
 
 // Priority mapping from Linear's numeric priority (0-4) to canonical priority.
@@ -73,6 +74,7 @@ type WorkspaceConfig struct {
 type Linear struct {
 	client           *http.Client
 	apiKey           string
+	apiEndpoint      string
 	teamKey          string
 	teamID           string
 	agentID          string
@@ -85,9 +87,15 @@ type Linear struct {
 
 // New creates a new Linear backend instance.
 func New() *Linear {
+	// Check for LINEAR_API_URL environment variable for testing/custom endpoints
+	apiEndpoint := os.Getenv("LINEAR_API_URL")
+	if apiEndpoint == "" {
+		apiEndpoint = defaultLinearAPIEndpoint
+	}
 	return &Linear{
-		ctx:    context.Background(),
-		client: &http.Client{Timeout: 30 * time.Second},
+		ctx:         context.Background(),
+		client:      &http.Client{Timeout: 30 * time.Second},
+		apiEndpoint: apiEndpoint,
 	}
 }
 
@@ -1447,7 +1455,7 @@ func (l *Linear) graphQL(query string, variables map[string]any) (map[string]any
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(l.ctx, "POST", linearAPIEndpoint, bytes.NewReader(jsonBody))
+	req, err := http.NewRequestWithContext(l.ctx, "POST", l.apiEndpoint, bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}

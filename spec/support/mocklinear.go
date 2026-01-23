@@ -200,16 +200,22 @@ func (m *MockLinearServer) handleGraphQL(w http.ResponseWriter, r *http.Request)
 	query := strings.TrimSpace(req.Query)
 
 	// Route to appropriate handler based on query content
+	// Note: Order matters - more specific checks must come before general ones
 	switch {
 	case strings.Contains(query, "viewer"):
 		m.handleViewerQuery(w)
+	case strings.Contains(query, "issueCreate") || strings.Contains(query, "createIssue"):
+		m.handleCreateIssue(w, req.Variables)
+	case strings.Contains(query, "issueUpdate") || strings.Contains(query, "updateIssue"):
+		m.handleUpdateIssue(w, req.Variables)
+	case strings.Contains(query, "issue(id:") || strings.Contains(query, "issue (id:"):
+		// Single issue query by ID - must come before issues list check
+		m.handleSingleIssueQuery(w, req.Variables)
 	case strings.Contains(query, "issues") || strings.Contains(query, "Issues"):
 		m.handleIssuesQuery(w, req.Variables)
-	case strings.Contains(query, "issue") && strings.Contains(query, "create"):
-		m.handleCreateIssue(w, req.Variables)
-	case strings.Contains(query, "issue") && strings.Contains(query, "update"):
-		m.handleUpdateIssue(w, req.Variables)
-	case strings.Contains(query, "team"):
+	case strings.Contains(query, "workflowStates"):
+		m.handleWorkflowStatesQuery(w, req.Variables)
+	case strings.Contains(query, "team("):
 		m.handleTeamQuery(w, req.Variables)
 	default:
 		// Default: return empty data for unrecognized queries
@@ -464,6 +470,65 @@ func (m *MockLinearServer) handleTeamQuery(w http.ResponseWriter, variables map[
 					"nodes": stateNodes,
 				},
 			},
+		},
+	})
+}
+
+// handleWorkflowStatesQuery handles the workflowStates query.
+func (m *MockLinearServer) handleWorkflowStatesQuery(w http.ResponseWriter, variables map[string]interface{}) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// Build states list from all registered states
+	var stateNodes []map[string]interface{}
+	for _, state := range m.States {
+		stateNodes = append(stateNodes, map[string]interface{}{
+			"id":   state.ID,
+			"name": state.Name,
+			"type": state.Type,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]interface{}{
+			"workflowStates": map[string]interface{}{
+				"nodes": stateNodes,
+			},
+		},
+	})
+}
+
+// handleSingleIssueQuery handles queries for a single issue by ID or identifier.
+func (m *MockLinearServer) handleSingleIssueQuery(w http.ResponseWriter, variables map[string]interface{}) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// Get the issue ID from variables
+	issueID, _ := variables["id"].(string)
+	if issueID == "" {
+		m.writeGraphQLError(w, "Issue ID required", "BAD_REQUEST")
+		return
+	}
+
+	// Try to find by ID first, then by identifier
+	var issue *MockLinearIssue
+	for _, i := range m.Issues {
+		if i.ID == issueID || i.Identifier == issueID {
+			issue = i
+			break
+		}
+	}
+
+	if issue == nil {
+		m.writeGraphQLError(w, "Issue not found", "NOT_FOUND")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]interface{}{
+			"issue": m.issueToGraphQL(issue),
 		},
 	})
 }

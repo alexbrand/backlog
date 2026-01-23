@@ -105,13 +105,16 @@ func NewMockGitHubServer() *MockGitHubServer {
 
 	// GET /user - authenticated user info
 	mux.HandleFunc("/user", mock.handleUser)
+	mux.HandleFunc("/api/v3/user", mock.handleUser)
 
 	// POST /graphql - GraphQL API for Projects v2
 	mux.HandleFunc("/graphql", mock.handleGraphQL)
+	mux.HandleFunc("/api/graphql", mock.handleGraphQL)
 
 	// GET /repos/{owner}/{repo}/issues - list issues
 	// POST /repos/{owner}/{repo}/issues - create issue
 	mux.HandleFunc("/repos/", mock.handleRepos)
+	mux.HandleFunc("/api/v3/repos/", mock.handleRepos)
 
 	mock.Server = httptest.NewServer(mux)
 	mock.URL = mock.Server.URL
@@ -261,6 +264,8 @@ func (m *MockGitHubServer) handleRepos(w http.ResponseWriter, r *http.Request) {
 	}
 
 	path := r.URL.Path
+	// Strip /api/v3 prefix if present (for enterprise URL compatibility)
+	path = strings.TrimPrefix(path, "/api/v3")
 
 	// Parse the path: /repos/{owner}/{repo}/...
 	// Match patterns:

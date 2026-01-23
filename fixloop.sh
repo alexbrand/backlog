@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -o pipefail
 
 MAX_ITERATIONS="${1:-10}"
 ITERATION=0

@@ -71,10 +71,9 @@ func (r *CLIRunner) RunArgs(args ...string) *CommandResult {
 		cmd.Dir = r.WorkDir
 	}
 
-	// Set environment variables
-	if len(r.Env) > 0 {
-		cmd.Env = append(cmd.Environ(), r.Env...)
-	}
+	// Always set cmd.Env to include parent environment plus any runner-specific env
+	// This ensures env vars set via os.Setenv are passed to the child process
+	cmd.Env = append(cmd.Environ(), r.Env...)
 
 	err := cmd.Run()
 

@@ -55,7 +55,14 @@ func init() {
 func runList() error {
 	// Validate and parse statuses
 	var statusFilters []backend.Status
+	includeDone := listIncludeDone
 	for _, s := range listStatus {
+		// Special handling for "all" which means all statuses including done
+		if s == "all" {
+			statusFilters = backend.ValidStatuses()
+			includeDone = true
+			break
+		}
 		status := backend.Status(s)
 		if !status.IsValid() {
 			return InvalidInputError(fmt.Sprintf("invalid status %q (valid: backlog, todo, in-progress, review, done)", s))
@@ -80,7 +87,7 @@ func runList() error {
 		Assignee:    listAssignee,
 		Labels:      listLabels,
 		Limit:       listLimit,
-		IncludeDone: listIncludeDone,
+		IncludeDone: includeDone,
 	}
 
 	// Get backend and connect
@@ -93,7 +100,7 @@ func runList() error {
 	// List tasks
 	taskList, err := b.List(filters)
 	if err != nil {
-		return fmt.Errorf("failed to list tasks: %w", err)
+		return WrapError("failed to list tasks", err)
 	}
 
 	// Output the result

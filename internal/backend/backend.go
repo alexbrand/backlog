@@ -73,7 +73,8 @@ type Task struct {
 	Priority Priority `json:"priority" yaml:"priority"`
 
 	// Assignee is the username or agent ID assigned to the task.
-	Assignee string `json:"assignee,omitempty" yaml:"assignee,omitempty"`
+	// Note: Not using omitempty so empty string is explicitly shown as "" in JSON
+	Assignee string `json:"assignee" yaml:"assignee,omitempty"`
 
 	// Labels are tags/labels associated with the task.
 	Labels []string `json:"labels,omitempty" yaml:"labels,omitempty"`

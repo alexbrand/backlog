@@ -131,7 +131,7 @@ func connectBackend() (backend.Backend, *config.Workspace, func(), error) {
 	}
 
 	if err := b.Connect(backendCfg); err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to connect to backend: %w", err)
+		return nil, nil, nil, WrapError("failed to connect to backend", err)
 	}
 
 	cleanup := func() {

@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/alexbrand/backlog/internal/output"
 )
@@ -63,6 +64,40 @@ func ConfigError(message string) *ExitCodeError {
 // InvalidInputError creates an invalid input error (exit code 1).
 func InvalidInputError(message string) *ExitCodeError {
 	return &ExitCodeError{Code: ExitError, JSONCode: "INVALID_INPUT", Message: message}
+}
+
+// AuthError creates an authentication error (exit code 1).
+func AuthError(message string) *ExitCodeError {
+	return &ExitCodeError{Code: ExitError, JSONCode: "AUTH_ERROR", Message: message}
+}
+
+// WrapAuthError wraps an existing error as an authentication error.
+func WrapAuthError(message string, err error) *ExitCodeError {
+	return &ExitCodeError{Code: ExitError, JSONCode: "AUTH_ERROR", Message: message, Err: err}
+}
+
+// IsAuthError checks if an error is an authentication-related error.
+func IsAuthError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := strings.ToLower(err.Error())
+	return strings.Contains(errStr, "401") ||
+		strings.Contains(errStr, "unauthorized") ||
+		strings.Contains(errStr, "authentication") ||
+		strings.Contains(errStr, "auth error") ||
+		strings.Contains(errStr, "invalid api key") ||
+		strings.Contains(errStr, "not authenticated") ||
+		strings.Contains(errStr, "bad credentials")
+}
+
+// WrapError wraps an error with appropriate error type detection.
+// It detects auth errors and wraps them with AUTH_ERROR code.
+func WrapError(message string, err error) error {
+	if IsAuthError(err) {
+		return WrapAuthError(message, err)
+	}
+	return &ExitCodeError{Code: ExitError, Message: message, Err: err}
 }
 
 // GetExitCode returns the exit code from an error.
