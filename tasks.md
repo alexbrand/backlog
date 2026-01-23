@@ -6,7 +6,7 @@
 - [x] Initialize Go module (`go mod init`)
 - [x] Create directory structure (`cmd/backlog/`, `internal/`)
 - [x] Set up Cobra CLI framework
-- [ ] Set up Viper for configuration
+- [x] Set up Viper for configuration
 
 ### Core Types & Interfaces
 - [ ] Define `Task` struct with all fields (id, title, description, status, priority, etc.)
