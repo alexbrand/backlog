@@ -195,6 +195,12 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the mock GitHub API authenticated user is "([^"]*)"$`, theMockGitHubAPIAuthenticatedUserIs)
 	ctx.Step(`^the mock GitHub issue "([^"]*)" has the following comments:$`, theMockGitHubIssueHasTheFollowingComments)
 	ctx.Step(`^the JSON output array "([^"]*)" should have length (\d+)$`, theJSONOutputArrayShouldHaveLength)
+
+	// GitHub assertion steps
+	ctx.Step(`^a GitHub repository "([^"]*)" with issues:$`, aGitHubRepositoryWithIssues)
+	ctx.Step(`^the GitHub token is "([^"]*)"$`, theGitHubTokenIs)
+	ctx.Step(`^the GitHub issue "([^"]*)" should have label "([^"]*)"$`, theGitHubIssueShouldHaveLabel)
+	ctx.Step(`^the GitHub issue "([^"]*)" should be assigned to "([^"]*)"$`, theGitHubIssueShouldBeAssignedTo)
 }
 
 // aFreshBacklogDirectory creates a new empty .backlog directory.
@@ -2538,4 +2544,106 @@ func theJSONOutputArrayShouldHaveLength(ctx context.Context, arrayPath string, e
 	}
 
 	return nil
+}
+
+// aGitHubRepositoryWithIssues sets up a mock GitHub repository with the specified issues.
+// This is a convenience step that combines starting the mock server and setting up issues.
+// The repository string is parsed but primarily used for documentation; the mock server
+// handles all requests regardless of the repo path.
+func aGitHubRepositoryWithIssues(ctx context.Context, repo string, table *godog.Table) (context.Context, error) {
+	// First ensure the mock server is running
+	server := getMockGitHubServer(ctx)
+	if server == nil {
+		// Start the mock server
+		var err error
+		ctx, err = aMockGitHubAPIServerIsRunning(ctx)
+		if err != nil {
+			return ctx, fmt.Errorf("failed to start mock GitHub API server: %w", err)
+		}
+		server = getMockGitHubServer(ctx)
+	}
+
+	// Now add the issues using the existing step
+	return theMockGitHubAPIHasTheFollowingIssues(ctx, table)
+}
+
+// theGitHubTokenIs sets the GitHub token for authentication.
+// This sets the GITHUB_TOKEN environment variable.
+func theGitHubTokenIs(ctx context.Context, token string) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	env.SetEnv("GITHUB_TOKEN", token)
+	return ctx, nil
+}
+
+// theGitHubIssueShouldHaveLabel verifies that a GitHub issue has the specified label.
+// The issue ID should be in the format "GH-{number}" or just the number.
+func theGitHubIssueShouldHaveLabel(ctx context.Context, issueID, label string) error {
+	server := getMockGitHubServer(ctx)
+	if server == nil {
+		return fmt.Errorf("mock GitHub API server not running")
+	}
+
+	// Parse issue number from ID (handle both "GH-42" and "42" formats)
+	issueNumber := parseGitHubIssueNumber(issueID)
+	if issueNumber <= 0 {
+		return fmt.Errorf("invalid issue ID format: %s (expected 'GH-{number}' or '{number}')", issueID)
+	}
+
+	issue := server.GetIssue(issueNumber)
+	if issue == nil {
+		return fmt.Errorf("GitHub issue %s not found in mock server", issueID)
+	}
+
+	for _, l := range issue.Labels {
+		if l == label {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("GitHub issue %s does not have label %q (has labels: %v)", issueID, label, issue.Labels)
+}
+
+// theGitHubIssueShouldBeAssignedTo verifies that a GitHub issue is assigned to the specified user.
+// The issue ID should be in the format "GH-{number}" or just the number.
+func theGitHubIssueShouldBeAssignedTo(ctx context.Context, issueID, assignee string) error {
+	server := getMockGitHubServer(ctx)
+	if server == nil {
+		return fmt.Errorf("mock GitHub API server not running")
+	}
+
+	// Parse issue number from ID (handle both "GH-42" and "42" formats)
+	issueNumber := parseGitHubIssueNumber(issueID)
+	if issueNumber <= 0 {
+		return fmt.Errorf("invalid issue ID format: %s (expected 'GH-{number}' or '{number}')", issueID)
+	}
+
+	issue := server.GetIssue(issueNumber)
+	if issue == nil {
+		return fmt.Errorf("GitHub issue %s not found in mock server", issueID)
+	}
+
+	if issue.Assignee != assignee {
+		return fmt.Errorf("GitHub issue %s is assigned to %q, expected %q", issueID, issue.Assignee, assignee)
+	}
+
+	return nil
+}
+
+// parseGitHubIssueNumber extracts the issue number from an ID string.
+// Handles both "GH-42" and "42" formats.
+func parseGitHubIssueNumber(issueID string) int {
+	// Try "GH-{number}" format first
+	var num int
+	if _, err := fmt.Sscanf(issueID, "GH-%d", &num); err == nil {
+		return num
+	}
+	// Try plain number format
+	if _, err := fmt.Sscanf(issueID, "%d", &num); err == nil {
+		return num
+	}
+	return 0
 }

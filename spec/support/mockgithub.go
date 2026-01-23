@@ -113,6 +113,14 @@ func (m *MockGitHubServer) SetComments(issueNumber int, comments []MockGitHubCom
 	m.Comments[issueNumber] = comments
 }
 
+// GetIssue retrieves an issue by number for assertions.
+// Returns nil if the issue does not exist.
+func (m *MockGitHubServer) GetIssue(number int) *MockGitHubIssue {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.Issues[number]
+}
+
 // validateAuth checks the Authorization header and returns an error response if invalid.
 func (m *MockGitHubServer) validateAuth(w http.ResponseWriter, r *http.Request) bool {
 	m.mu.RLock()
