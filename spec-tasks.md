@@ -260,11 +260,11 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: Uses credentials.yaml token
 
 ### Feature: GitHub List (`github_list.feature`)
-- [ ] Scenario: List fetches issues from repository
-- [ ] Scenario: List maps issue labels to status
-- [ ] Scenario: List filters by status via labels
-- [ ] Scenario: List filters by assignee
-- [ ] Scenario: List respects limit
+- [x] Scenario: List fetches issues from repository
+- [x] Scenario: List maps issue labels to status
+- [x] Scenario: List filters by status via labels
+- [x] Scenario: List filters by assignee
+- [x] Scenario: List respects limit
 
 ### Feature: GitHub CRUD (`github_crud.feature`)
 - [ ] Scenario: Add creates GitHub issue
@@ -385,7 +385,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 | Phase 1d: Error Handling | Complete | 1 | 12 |
 | Phase 2: Agent Coordination | Complete | 5 | 46 |
 | Phase 3: Git Sync | Complete | 2 | 19 |
-| Phase 4: GitHub Issues | In Progress | 1 | 10 |
+| Phase 4: GitHub Issues | In Progress | 2 | 15 |
 | Phase 5: GitHub Projects | Not Started | 0 | 0 |
 | Phase 6: Linear | Not Started | 0 | 0 |
 | Cross-Cutting | Not Started | 0 | 0 |

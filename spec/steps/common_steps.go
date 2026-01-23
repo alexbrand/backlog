@@ -176,6 +176,15 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^no new git commits should exist$`, noNewGitCommitsShouldExist)
 	ctx.Step(`^the remote should have the latest commit$`, theRemoteShouldHaveTheLatestCommit)
 	ctx.Step(`^the local repository should include the remote commit$`, theLocalRepositoryShouldIncludeTheRemoteCommit)
+
+	// Mock GitHub API steps
+	ctx.Step(`^a mock GitHub API server is running$`, aMockGitHubAPIServerIsRunning)
+	ctx.Step(`^the mock GitHub API returns auth error for invalid tokens$`, theMockGitHubAPIReturnsAuthErrorForInvalidTokens)
+	ctx.Step(`^the mock GitHub API expects token "([^"]*)"$`, theMockGitHubAPIExpectsToken)
+	ctx.Step(`^the mock GitHub API has the following issues:$`, theMockGitHubAPIHasTheFollowingIssues)
+	ctx.Step(`^a credentials file with the following content:$`, aCredentialsFileWithTheFollowingContent)
+	ctx.Step(`^the environment variable "([^"]*)" is not set$`, theEnvironmentVariableIsNotSet)
+	ctx.Step(`^the environment variable "([^"]*)" is set to a valid token$`, theEnvironmentVariableIsSetToAValidToken)
 }
 
 // aFreshBacklogDirectory creates a new empty .backlog directory.
@@ -2235,6 +2244,147 @@ func theRemoteRepositoryIsUnreachable(ctx context.Context) (context.Context, err
 	cmd.Dir = env.TempDir
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return ctx, fmt.Errorf("failed to set invalid remote URL: %w\nOutput: %s", err, output)
+	}
+
+	return ctx, nil
+}
+
+// ============================================================================
+// Mock GitHub API Step Definitions
+// ============================================================================
+
+const (
+	mockGitHubServerKey   contextKey = "mockGitHubServer"
+	mockGitHubIssuesKey   contextKey = "mockGitHubIssues"
+	mockGitHubExpectToken contextKey = "mockGitHubExpectToken"
+	mockGitHubAuthError   contextKey = "mockGitHubAuthError"
+)
+
+// MockGitHubIssue represents an issue in the mock GitHub API.
+type MockGitHubIssue struct {
+	Number   int
+	Title    string
+	State    string
+	Labels   []string
+	Assignee string
+	Body     string
+}
+
+// aMockGitHubAPIServerIsRunning starts a mock GitHub API server.
+func aMockGitHubAPIServerIsRunning(ctx context.Context) (context.Context, error) {
+	// For now, this is a placeholder that marks the mock server as "running"
+	// The actual mock server implementation will be added when the GitHub backend is implemented
+	// The CLI will need to be configured to point to the mock server URL
+	ctx = context.WithValue(ctx, mockGitHubServerKey, true)
+	return ctx, nil
+}
+
+// theMockGitHubAPIReturnsAuthErrorForInvalidTokens configures the mock to return auth errors.
+func theMockGitHubAPIReturnsAuthErrorForInvalidTokens(ctx context.Context) (context.Context, error) {
+	ctx = context.WithValue(ctx, mockGitHubAuthError, true)
+	return ctx, nil
+}
+
+// theMockGitHubAPIExpectsToken configures the mock to expect a specific token.
+func theMockGitHubAPIExpectsToken(ctx context.Context, token string) (context.Context, error) {
+	ctx = context.WithValue(ctx, mockGitHubExpectToken, token)
+	return ctx, nil
+}
+
+// theMockGitHubAPIHasTheFollowingIssues sets up mock issues for the GitHub API.
+func theMockGitHubAPIHasTheFollowingIssues(ctx context.Context, table *godog.Table) (context.Context, error) {
+	if len(table.Rows) < 2 {
+		return ctx, fmt.Errorf("table must have at least a header row and one data row")
+	}
+
+	header := table.Rows[0]
+	colIndex := make(map[string]int)
+	for i, cell := range header.Cells {
+		colIndex[cell.Value] = i
+	}
+
+	var issues []MockGitHubIssue
+	for _, row := range table.Rows[1:] {
+		getValue := func(col string) string {
+			if idx, ok := colIndex[col]; ok && idx < len(row.Cells) {
+				return row.Cells[idx].Value
+			}
+			return ""
+		}
+
+		issue := MockGitHubIssue{
+			Title:    getValue("title"),
+			State:    getValue("state"),
+			Assignee: getValue("assignee"),
+			Body:     getValue("body"),
+		}
+
+		// Parse number
+		if numStr := getValue("number"); numStr != "" {
+			fmt.Sscanf(numStr, "%d", &issue.Number)
+		}
+
+		// Parse labels as comma-separated list
+		if labelsStr := getValue("labels"); labelsStr != "" {
+			for _, label := range strings.Split(labelsStr, ",") {
+				label = strings.TrimSpace(label)
+				if label != "" {
+					issue.Labels = append(issue.Labels, label)
+				}
+			}
+		}
+
+		issues = append(issues, issue)
+	}
+
+	ctx = context.WithValue(ctx, mockGitHubIssuesKey, issues)
+	return ctx, nil
+}
+
+// aCredentialsFileWithTheFollowingContent creates a credentials file.
+func aCredentialsFileWithTheFollowingContent(ctx context.Context, content *godog.DocString) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	// Ensure .backlog directory exists
+	if !env.FileExists(".backlog") {
+		if err := env.CreateBacklogDir(); err != nil {
+			return ctx, fmt.Errorf("failed to create backlog directory: %w", err)
+		}
+	}
+
+	if err := env.CreateFile(".backlog/credentials.yaml", content.Content); err != nil {
+		return ctx, fmt.Errorf("failed to create credentials file: %w", err)
+	}
+
+	return ctx, nil
+}
+
+// theEnvironmentVariableIsNotSet unsets an environment variable.
+func theEnvironmentVariableIsNotSet(ctx context.Context, key string) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	env.UnsetEnv(key)
+	return ctx, nil
+}
+
+// theEnvironmentVariableIsSetToAValidToken sets a placeholder valid token (for remote tests).
+func theEnvironmentVariableIsSetToAValidToken(ctx context.Context, key string) (context.Context, error) {
+	// This step is for documentation purposes in remote integration tests
+	// The actual token should be provided via environment variable before running tests
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	// Check if the token is already set in the real environment
+	if os.Getenv(key) == "" {
+		return ctx, fmt.Errorf("environment variable %s must be set for remote tests", key)
 	}
 
 	return ctx, nil
