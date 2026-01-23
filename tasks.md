@@ -40,7 +40,7 @@
 - [x] Implement `backlog init` — create `.backlog/` directory structure
 - [x] Implement `backlog add <title>` with flags (`--priority`, `--label`, `--description`, `--body-file`, `--status`)
 - [x] Implement `backlog list` with filters (`--status`, `--assignee`, `--priority`, `--label`, `--limit`)
-- [ ] Implement `backlog show <id>` with `--comments` flag
+- [x] Implement `backlog show <id>` with `--comments` flag
 - [ ] Implement `backlog move <id> <status>`
 - [ ] Implement `backlog edit <id>` with flags (`--title`, `--priority`, `--add-label`, `--remove-label`, `--description`)
 
@@ -56,7 +56,7 @@
 - [ ] Implement `backlog config show`
 
 ### Error Handling
-- [ ] Define exit codes (0=success, 1=error, 2=conflict, 3=not found, 4=config error)
+- [x] Define exit codes (0=success, 1=error, 2=conflict, 3=not found, 4=config error)
 - [ ] Implement consistent error output format (stderr)
 - [ ] Implement JSON error output when `--format=json`
 
