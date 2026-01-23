@@ -201,7 +201,7 @@
 - [x] Unit tests for Linear backend
 - [x] Unit tests for GitHub backend
 - [x] Integration tests for CLI commands
-- [ ] Test multi-agent claim scenarios
+- [x] Test multi-agent claim scenarios
 
 ### Documentation
 - [ ] Write README.md with installation and usage
