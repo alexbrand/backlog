@@ -345,8 +345,8 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: Move non-existent issue returns exit code 3
 
 ### Feature: Linear Status Mapping (`linear_status.feature`)
-- [ ] Scenario: Linear states map to canonical statuses
-- [ ] Scenario: Custom state mapping in config
+- [x] Scenario: Linear states map to canonical statuses
+- [x] Scenario: Custom state mapping in config
 
 ### Feature: Linear Claims (`linear_claim.feature`)
 - [ ] Scenario: Claim adds agent label
