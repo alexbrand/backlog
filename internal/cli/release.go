@@ -12,6 +12,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var releaseComment string
+
 var releaseCmd = &cobra.Command{
 	Use:   "release <id>",
 	Short: "Release a claimed task back to todo",
@@ -28,18 +30,20 @@ available for other agents.
 
 Examples:
   backlog release 001
+  backlog release 001 --comment="Blocked on external API"
   backlog release 001 -f json`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return runRelease(args[0])
+		return runRelease(args[0], releaseComment)
 	},
 }
 
 func init() {
+	releaseCmd.Flags().StringVar(&releaseComment, "comment", "", "Add a comment when releasing the task")
 	rootCmd.AddCommand(releaseCmd)
 }
 
-func runRelease(id string) error {
+func runRelease(id, comment string) error {
 	// Get backend and configuration
 	var b backend.Backend
 	var backendCfg backend.Config
@@ -117,6 +121,13 @@ func runRelease(id string) error {
 			return NotFoundError(err.Error())
 		}
 		return err
+	}
+
+	// Add comment if provided
+	if comment != "" {
+		if _, err := b.AddComment(id, comment); err != nil {
+			return fmt.Errorf("task released but failed to add comment: %w", err)
+		}
 	}
 
 	// Get the updated task for output

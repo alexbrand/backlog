@@ -92,7 +92,7 @@
 ### Comments
 - [x] Implement `backlog comment <id> <message>`
 - [x] Implement `--body-file` flag for comments
-- [ ] Implement `--comment` flag for `move` and `release` commands
+- [x] Implement `--comment` flag for `move` and `release` commands
 
 ---
 
@@ -217,7 +217,7 @@
 | Phase | Status | Tasks |
 |-------|--------|-------|
 | Phase 1: Local CRUD | Complete | All done |
-| Phase 2: Agent Coordination | In Progress | Backend locking done, CLI commands pending |
+| Phase 2: Agent Coordination | Complete | All done |
 | Phase 3: Git Sync | Not Started | 0/X |
 | Phase 4: GitHub Issues | Not Started | 0/X |
 | Phase 5: GitHub Projects | Not Started | 0/X |

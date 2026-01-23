@@ -12,6 +12,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var moveComment string
+
 var moveCmd = &cobra.Command{
 	Use:   "move <id> <status>",
 	Short: "Transition a task to a new status",
@@ -22,18 +24,20 @@ Valid statuses: backlog, todo, in-progress, review, done
 Examples:
   backlog move 001 in-progress
   backlog move 001 done
+  backlog move 001 review --comment="Ready for review"
   backlog move 001 review -f json`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return runMove(args[0], args[1])
+		return runMove(args[0], args[1], moveComment)
 	},
 }
 
 func init() {
+	moveCmd.Flags().StringVar(&moveComment, "comment", "", "Add a comment when moving the task")
 	rootCmd.AddCommand(moveCmd)
 }
 
-func runMove(id, statusStr string) error {
+func runMove(id, statusStr, comment string) error {
 	// Validate status
 	status := backend.Status(statusStr)
 	if !status.IsValid() {
@@ -112,6 +116,13 @@ func runMove(id, statusStr string) error {
 			return NotFoundError(err.Error())
 		}
 		return err
+	}
+
+	// Add comment if provided
+	if comment != "" {
+		if _, err := b.AddComment(id, comment); err != nil {
+			return fmt.Errorf("task moved but failed to add comment: %w", err)
+		}
 	}
 
 	// Output the result
