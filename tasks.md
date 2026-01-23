@@ -118,7 +118,7 @@
 ## Phase 4: GitHub Backend — Issues
 
 ### GitHub Backend Implementation
-- [ ] Create `internal/github/` package
+- [x] Create `internal/github/` package
 - [ ] Implement GitHub API client setup (go-github)
 - [ ] Implement `Connect()` with token authentication
 - [ ] Implement `HealthCheck()`

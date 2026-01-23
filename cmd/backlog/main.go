@@ -4,12 +4,14 @@ import (
 	"os"
 
 	"github.com/alexbrand/backlog/internal/cli"
+	"github.com/alexbrand/backlog/internal/github"
 	"github.com/alexbrand/backlog/internal/local"
 )
 
 func init() {
 	// Register all backends
 	local.Register()
+	github.Register()
 }
 
 func main() {
