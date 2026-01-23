@@ -180,3 +180,19 @@ Feature: Listing Tasks
     And stdout should not contain "Bob's task"
     And stdout should not contain "Unassigned"
     And stdout should not contain "Carol's task"
+
+  Scenario: List unassigned tasks
+    Given a backlog with the following tasks:
+      | id    | title           | status      | priority | assignee |
+      | task1 | Alice's task    | todo        | high     | alice    |
+      | task2 | Bob's task      | in-progress | medium   | bob      |
+      | task3 | Unassigned one  | backlog     | low      |          |
+      | task4 | Unassigned two  | todo        | urgent   |          |
+      | task5 | Carol's task    | review      | medium   | carol    |
+    When I run "backlog list --assignee=unassigned"
+    Then the exit code should be 0
+    And stdout should contain "Unassigned one"
+    And stdout should contain "Unassigned two"
+    And stdout should not contain "Alice's task"
+    And stdout should not contain "Bob's task"
+    And stdout should not contain "Carol's task"
