@@ -75,7 +75,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: List unassigned tasks
 - [x] Scenario: List with limit
 - [x] Scenario: List returns empty when no tasks match
-- [ ] Scenario: List shows hasMore flag when more tasks exist
+- [x] Scenario: List shows hasMore flag when more tasks exist
 
 ### Feature: Showing Tasks (`show.feature`)
 - [ ] Scenario: Show task displays all fields

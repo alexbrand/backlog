@@ -224,3 +224,17 @@ Feature: Listing Tasks
     And the JSON output should have "count" equal to "0"
     And the JSON output should have "tasks" as an array
     And the JSON output should have array length "tasks" equal to 0
+
+  Scenario: List shows hasMore flag when more tasks exist
+    Given a backlog with the following tasks:
+      | id    | title           | status      | priority |
+      | task1 | First task      | todo        | urgent   |
+      | task2 | Second task     | todo        | high     |
+      | task3 | Third task      | todo        | medium   |
+      | task4 | Fourth task     | todo        | low      |
+      | task5 | Fifth task      | todo        | none     |
+    When I run "backlog list --limit=3 -f json"
+    Then the exit code should be 0
+    And the JSON output should be valid
+    And the JSON output should have "count" equal to "3"
+    And the JSON output should have "hasMore" equal to "true"
