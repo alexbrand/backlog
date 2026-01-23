@@ -273,10 +273,10 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: Move updates status labels
 
 ### Feature: GitHub Status Mapping (`github_status.feature`)
-- [ ] Scenario: Default status mapping (labels)
-- [ ] Scenario: Custom status_map in config
-- [ ] Scenario: Unknown status maps to backlog with warning
-- [ ] Scenario: Move to unmapped status fails
+- [x] Scenario: Default status mapping (labels)
+- [x] Scenario: Custom status_map in config
+- [x] Scenario: Unknown status maps to backlog with warning
+- [x] Scenario: Move to unmapped status fails
 
 ### Feature: GitHub Claims (`github_claim.feature`)
 - [ ] Scenario: Claim adds agent label to issue
