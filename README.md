@@ -11,11 +11,28 @@ A command-line tool for managing tasks across multiple issue tracking backends. 
 
 ## Installation
 
+### Homebrew (macOS and Linux)
+
+```bash
+brew install alexbrand/tap/backlog
+```
+
+Or add the tap first:
+
+```bash
+brew tap alexbrand/tap
+brew install backlog
+```
+
 ### From Source
 
 ```bash
 go install github.com/alexbrand/backlog/cmd/backlog@latest
 ```
+
+### Download Binary
+
+Download pre-built binaries from the [releases page](https://github.com/alexbrand/backlog/releases).
 
 ### Build Locally
 
