@@ -47,9 +47,14 @@ func NewCLIRunner(binaryPath string) *CLIRunner {
 
 // Run executes a command string and captures the result.
 // The command string is parsed as shell-like arguments.
-// Example: Run("list --status=todo -f json")
+// If the first argument is "backlog", it is stripped since the binary name is already "backlog".
+// Example: Run("backlog list --status=todo -f json") or Run("list --status=todo -f json")
 func (r *CLIRunner) Run(commandStr string) *CommandResult {
 	args := parseArgs(commandStr)
+	// Strip "backlog" prefix if present since the binary is already named "backlog"
+	if len(args) > 0 && args[0] == "backlog" {
+		args = args[1:]
+	}
 	return r.RunArgs(args...)
 }
 

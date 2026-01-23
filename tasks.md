@@ -38,7 +38,7 @@
 
 ### CLI Commands - Phase 1
 - [x] Implement `backlog init` — create `.backlog/` directory structure
-- [ ] Implement `backlog add <title>` with flags (`--priority`, `--label`, `--description`, `--body-file`, `--status`)
+- [x] Implement `backlog add <title>` with flags (`--priority`, `--label`, `--description`, `--body-file`, `--status`)
 - [ ] Implement `backlog list` with filters (`--status`, `--assignee`, `--priority`, `--label`, `--limit`)
 - [ ] Implement `backlog show <id>` with `--comments` flag
 - [ ] Implement `backlog move <id> <status>`
