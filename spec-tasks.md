@@ -10,11 +10,11 @@ This plan covers implementing a Gherkin-based executable specification using [go
 
 ### Project Setup
 - [x] Add godog dependency (`go get github.com/cucumber/godog`)
-- [ ] Create `spec/` directory structure
-- [ ] Create `spec/features/` for `.feature` files
-- [ ] Create `spec/steps/` for step definitions
-- [ ] Create `spec/support/` for test helpers and fixtures
-- [ ] Create `spec/main_test.go` — godog test runner entry point
+- [x] Create `spec/` directory structure
+- [x] Create `spec/features/` for `.feature` files
+- [x] Create `spec/steps/` for step definitions
+- [x] Create `spec/support/` for test helpers and fixtures
+- [x] Create `spec/main_test.go` — godog test runner entry point
 
 ### Test Harness
 - [ ] Implement temp directory setup/teardown for isolated test runs
