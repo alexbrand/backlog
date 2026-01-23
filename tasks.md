@@ -81,9 +81,9 @@
 ### CLI Commands - Phase 2
 - [x] Implement `backlog claim <id>` — acquire lock, add agent label to frontmatter, move to `in-progress`
 - [x] Implement `backlog release <id>` — release lock, remove agent label, move to `todo`
-- [ ] Implement `backlog next` — find highest priority unclaimed task
-- [ ] Implement `backlog next --claim` — atomic claim
-- [ ] Implement `backlog next --label=<label>` — filtered next
+- [x] Implement `backlog next` — find highest priority unclaimed task
+- [x] Implement `backlog next --claim` — atomic claim
+- [x] Implement `backlog next --label=<label>` — filtered next
 
 ### Conflict Handling
 - [x] Return exit code 2 when task already claimed by another agent — `ClaimConflictError` type
