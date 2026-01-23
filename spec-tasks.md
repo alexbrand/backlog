@@ -237,9 +237,9 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: Failed push returns exit code 2
 
 ### Feature: Git-Based Claims (`git_claim.feature`)
-- [ ] Scenario: Claim with lock_mode git commits and pushes
-- [ ] Scenario: Concurrent git claims — push conflict returns exit code 2
-- [ ] Scenario: Release with git commits and pushes
+- [x] Scenario: Claim with lock_mode git commits and pushes
+- [x] Scenario: Concurrent git claims — push conflict returns exit code 2
+- [x] Scenario: Release with git commits and pushes
 
 ### Step Definitions - Phase 3
 - [x] Implement "Given git_sync is enabled"
@@ -384,7 +384,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 | Phase 1c: Configuration | Complete | 2 | 16 |
 | Phase 1d: Error Handling | Complete | 1 | 12 |
 | Phase 2: Agent Coordination | Complete | 5 | 46 |
-| Phase 3: Git Sync | In Progress | 1 | 12 |
+| Phase 3: Git Sync | Complete | 2 | 19 |
 | Phase 4: GitHub Issues | Not Started | 0 | 0 |
 | Phase 5: GitHub Projects | Not Started | 0 | 0 |
 | Phase 6: Linear | Not Started | 0 | 0 |

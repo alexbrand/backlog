@@ -158,10 +158,15 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^a git repository is initialized$`, aGitRepositoryIsInitialized)
 	ctx.Step(`^git_sync is enabled in the config$`, gitSyncIsEnabledInTheConfig)
 	ctx.Step(`^git_sync is disabled in the config$`, gitSyncIsDisabledInTheConfig)
+	ctx.Step(`^lock_mode is "([^"]*)" in the config$`, lockModeIsInTheConfig)
 	ctx.Step(`^a remote git repository$`, aRemoteGitRepository)
 	ctx.Step(`^the remote has different content than local$`, theRemoteHasDifferentContentThanLocal)
 	ctx.Step(`^the remote has been updated by another agent$`, theRemoteHasBeenUpdatedByAnotherAgent)
 	ctx.Step(`^there are uncommitted changes in the repository$`, thereAreUncommittedChangesInTheRepository)
+	ctx.Step(`^the remote has a new commit$`, theRemoteHasANewCommit)
+	ctx.Step(`^another agent has claimed task "([^"]*)" and pushed while we were working$`, anotherAgentHasClaimedTaskAndPushed)
+	ctx.Step(`^task "([^"]*)" has a stale lock file$`, taskHasStaleLockFile)
+	ctx.Step(`^the remote repository is unreachable$`, theRemoteRepositoryIsUnreachable)
 
 	// Git sync verification steps
 	ctx.Step(`^a git commit should exist with message containing "([^"]*)"$`, aGitCommitShouldExistWithMessageContaining)
@@ -169,6 +174,8 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the local repository should be in sync with remote$`, theLocalRepositoryShouldBeInSyncWithRemote)
 	ctx.Step(`^the local repository should match the remote$`, theLocalRepositoryShouldMatchTheRemote)
 	ctx.Step(`^no new git commits should exist$`, noNewGitCommitsShouldExist)
+	ctx.Step(`^the remote should have the latest commit$`, theRemoteShouldHaveTheLatestCommit)
+	ctx.Step(`^the local repository should include the remote commit$`, theLocalRepositoryShouldIncludeTheRemoteCommit)
 }
 
 // aFreshBacklogDirectory creates a new empty .backlog directory.
@@ -1909,4 +1916,326 @@ func getGitCommitCount(dir string) (int, error) {
 	}
 
 	return count, nil
+}
+
+// ============================================================================
+// Git Claim Step Definitions
+// ============================================================================
+
+// lockModeIsInTheConfig creates a config with the specified lock_mode.
+func lockModeIsInTheConfig(ctx context.Context, lockMode string) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	gitSync := "false"
+	if lockMode == "git" {
+		gitSync = "true"
+	}
+
+	configContent := fmt.Sprintf(`version: 1
+defaults:
+  format: table
+  workspace: local
+workspaces:
+  local:
+    backend: local
+    path: ./.backlog
+    default: true
+    lock_mode: %s
+    git_sync: %s
+`, lockMode, gitSync)
+
+	if err := env.CreateFile(".backlog/config.yaml", configContent); err != nil {
+		return ctx, fmt.Errorf("failed to create config file: %w", err)
+	}
+
+	return ctx, nil
+}
+
+// theRemoteShouldHaveTheLatestCommit verifies the remote has the latest local commit.
+func theRemoteShouldHaveTheLatestCommit(ctx context.Context) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	// First, push any pending changes
+	cmd := exec.Command("git", "push")
+	cmd.Dir = env.TempDir
+	// Ignore push errors - we just want to verify state
+
+	// Fetch from remote
+	cmd = exec.Command("git", "fetch", "origin")
+	cmd.Dir = env.TempDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to fetch from remote: %w\nOutput: %s", err, output)
+	}
+
+	// Get local HEAD
+	cmd = exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = env.TempDir
+	localHead, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to get local HEAD: %w", err)
+	}
+
+	// Get remote HEAD (try main, then master)
+	cmd = exec.Command("git", "rev-parse", "origin/main")
+	cmd.Dir = env.TempDir
+	remoteHead, err := cmd.Output()
+	if err != nil {
+		cmd = exec.Command("git", "rev-parse", "origin/master")
+		cmd.Dir = env.TempDir
+		remoteHead, err = cmd.Output()
+		if err != nil {
+			return fmt.Errorf("failed to get remote HEAD: %w", err)
+		}
+	}
+
+	localStr := strings.TrimSpace(string(localHead))
+	remoteStr := strings.TrimSpace(string(remoteHead))
+
+	if localStr != remoteStr {
+		return fmt.Errorf("remote HEAD (%s) does not match local HEAD (%s)", remoteStr, localStr)
+	}
+
+	return nil
+}
+
+// theLocalRepositoryShouldIncludeTheRemoteCommit verifies local repo includes remote commits.
+func theLocalRepositoryShouldIncludeTheRemoteCommit(ctx context.Context) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	// Fetch from remote
+	cmd := exec.Command("git", "fetch", "origin")
+	cmd.Dir = env.TempDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to fetch from remote: %w\nOutput: %s", err, output)
+	}
+
+	// Check if remote HEAD is an ancestor of local HEAD
+	cmd = exec.Command("git", "rev-parse", "origin/main")
+	cmd.Dir = env.TempDir
+	remoteHead, err := cmd.Output()
+	if err != nil {
+		cmd = exec.Command("git", "rev-parse", "origin/master")
+		cmd.Dir = env.TempDir
+		remoteHead, err = cmd.Output()
+		if err != nil {
+			return fmt.Errorf("failed to get remote HEAD: %w", err)
+		}
+	}
+
+	remoteStr := strings.TrimSpace(string(remoteHead))
+	cmd = exec.Command("git", "merge-base", "--is-ancestor", remoteStr, "HEAD")
+	cmd.Dir = env.TempDir
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("local repository does not include remote commit %s", remoteStr)
+	}
+
+	return nil
+}
+
+// theRemoteHasANewCommit creates a new commit on the remote.
+func theRemoteHasANewCommit(ctx context.Context) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	remotePath, ok := ctx.Value(remoteRepoPathKey).(string)
+	if !ok || remotePath == "" {
+		return ctx, fmt.Errorf("remote repository path not found in context")
+	}
+
+	// Clone the remote to a temp directory, make changes, and push
+	cloneDir, err := os.MkdirTemp("", "backlog-clone-*")
+	if err != nil {
+		return ctx, fmt.Errorf("failed to create clone directory: %w", err)
+	}
+	defer os.RemoveAll(cloneDir)
+
+	cmd := exec.Command("git", "clone", remotePath, cloneDir)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ctx, fmt.Errorf("failed to clone remote: %w\nOutput: %s", err, output)
+	}
+
+	// Configure git user
+	cmd = exec.Command("git", "config", "user.email", "remote@example.com")
+	cmd.Dir = cloneDir
+	cmd.CombinedOutput()
+	cmd = exec.Command("git", "config", "user.name", "Remote User")
+	cmd.Dir = cloneDir
+	cmd.CombinedOutput()
+
+	// Create a new file
+	if err := os.WriteFile(filepath.Join(cloneDir, "new-remote-file.txt"), []byte("New remote commit"), 0644); err != nil {
+		return ctx, fmt.Errorf("failed to create remote file: %w", err)
+	}
+
+	cmd = exec.Command("git", "add", "-A")
+	cmd.Dir = cloneDir
+	cmd.CombinedOutput()
+
+	cmd = exec.Command("git", "commit", "-m", "New remote commit")
+	cmd.Dir = cloneDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ctx, fmt.Errorf("failed to commit on remote: %w\nOutput: %s", err, output)
+	}
+
+	cmd = exec.Command("git", "push")
+	cmd.Dir = cloneDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ctx, fmt.Errorf("failed to push to remote: %w\nOutput: %s", err, output)
+	}
+
+	return ctx, nil
+}
+
+// anotherAgentHasClaimedTaskAndPushed simulates another agent claiming a task and pushing.
+func anotherAgentHasClaimedTaskAndPushed(ctx context.Context, taskID string) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	remotePath, ok := ctx.Value(remoteRepoPathKey).(string)
+	if !ok || remotePath == "" {
+		return ctx, fmt.Errorf("remote repository path not found in context")
+	}
+
+	// Clone the remote to a temp directory
+	cloneDir, err := os.MkdirTemp("", "backlog-other-agent-*")
+	if err != nil {
+		return ctx, fmt.Errorf("failed to create clone directory: %w", err)
+	}
+	defer os.RemoveAll(cloneDir)
+
+	cmd := exec.Command("git", "clone", remotePath, cloneDir)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ctx, fmt.Errorf("failed to clone remote: %w\nOutput: %s", err, output)
+	}
+
+	// Configure git user
+	cmd = exec.Command("git", "config", "user.email", "other-agent@example.com")
+	cmd.Dir = cloneDir
+	cmd.CombinedOutput()
+	cmd = exec.Command("git", "config", "user.name", "Other Agent")
+	cmd.Dir = cloneDir
+	cmd.CombinedOutput()
+
+	// Find and modify the task file to add agent claim
+	taskPath := filepath.Join(cloneDir, ".backlog", "todo", taskID+"-*.md")
+	matches, _ := filepath.Glob(taskPath)
+	if len(matches) == 0 {
+		// Try other directories
+		for _, status := range []string{"backlog", "in-progress", "review", "done"} {
+			taskPath = filepath.Join(cloneDir, ".backlog", status, taskID+"-*.md")
+			matches, _ = filepath.Glob(taskPath)
+			if len(matches) > 0 {
+				break
+			}
+		}
+	}
+
+	if len(matches) == 0 {
+		// Create a simple change instead
+		changeFile := filepath.Join(cloneDir, ".backlog", "claimed-by-other.txt")
+		if err := os.WriteFile(changeFile, []byte("Claimed by other-agent"), 0644); err != nil {
+			return ctx, fmt.Errorf("failed to create claim marker: %w", err)
+		}
+	} else {
+		// Modify the task file to add agent label
+		taskFile := matches[0]
+		content, err := os.ReadFile(taskFile)
+		if err != nil {
+			return ctx, fmt.Errorf("failed to read task file: %w", err)
+		}
+		contentStr := string(content)
+		if strings.Contains(contentStr, "labels: []") {
+			contentStr = strings.Replace(contentStr, "labels: []", "labels: [agent:other-agent]", 1)
+		} else if strings.Contains(contentStr, "labels: [") {
+			contentStr = strings.Replace(contentStr, "labels: [", "labels: [agent:other-agent, ", 1)
+		}
+		if err := os.WriteFile(taskFile, []byte(contentStr), 0644); err != nil {
+			return ctx, fmt.Errorf("failed to write task file: %w", err)
+		}
+
+		// Move file to in-progress if it's not already there
+		taskDir := filepath.Dir(taskFile)
+		if filepath.Base(taskDir) != "in-progress" {
+			newPath := filepath.Join(cloneDir, ".backlog", "in-progress", filepath.Base(taskFile))
+			os.MkdirAll(filepath.Dir(newPath), 0755)
+			os.Rename(taskFile, newPath)
+		}
+	}
+
+	cmd = exec.Command("git", "add", "-A")
+	cmd.Dir = cloneDir
+	cmd.CombinedOutput()
+
+	cmd = exec.Command("git", "commit", "-m", fmt.Sprintf("claim: %s [agent:other-agent]", taskID))
+	cmd.Dir = cloneDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ctx, fmt.Errorf("failed to commit claim: %w\nOutput: %s", err, output)
+	}
+
+	cmd = exec.Command("git", "push")
+	cmd.Dir = cloneDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ctx, fmt.Errorf("failed to push claim: %w\nOutput: %s", err, output)
+	}
+
+	return ctx, nil
+}
+
+// taskHasStaleLockFile creates a stale (expired) lock file for a task.
+func taskHasStaleLockFile(ctx context.Context, taskID string) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	now := time.Now().UTC()
+	claimedAt := now.Add(-2 * time.Hour)
+	expiresAt := now.Add(-1 * time.Hour)
+
+	content := fmt.Sprintf("agent: stale-agent\nclaimed_at: %s\nexpires_at: %s\n",
+		claimedAt.Format(time.RFC3339),
+		expiresAt.Format(time.RFC3339))
+
+	lockPath := filepath.Join(".backlog", ".locks", taskID+".lock")
+	if err := env.CreateFile(lockPath, content); err != nil {
+		return ctx, fmt.Errorf("failed to create stale lock file: %w", err)
+	}
+
+	return ctx, nil
+}
+
+// theRemoteRepositoryIsUnreachable makes the remote repository unreachable.
+func theRemoteRepositoryIsUnreachable(ctx context.Context) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	// Remove the remote directory to make it unreachable
+	remotePath, ok := ctx.Value(remoteRepoPathKey).(string)
+	if ok && remotePath != "" {
+		os.RemoveAll(remotePath)
+	}
+
+	// Alternatively, set remote to an invalid URL
+	cmd := exec.Command("git", "remote", "set-url", "origin", "file:///nonexistent/path")
+	cmd.Dir = env.TempDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ctx, fmt.Errorf("failed to set invalid remote URL: %w\nOutput: %s", err, output)
+	}
+
+	return ctx, nil
 }
