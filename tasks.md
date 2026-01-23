@@ -24,17 +24,17 @@
 - [x] Implement `id-only` formatter
 
 ### Local Backend Implementation
-- [ ] Create `internal/local/` package
-- [ ] Implement task file parsing (YAML frontmatter + markdown body)
-- [ ] Implement task file writing
-- [ ] Implement `Name()` and `Version()` methods
-- [ ] Implement `Connect()` — validate/create `.backlog/` structure
-- [ ] Implement `List()` — scan all status directories
-- [ ] Implement `Get()` — read single task file
-- [ ] Implement `Create()` — generate ID, write file to `backlog/`
-- [ ] Implement `Update()` — modify frontmatter/body
-- [ ] Implement `Delete()` — remove task file
-- [ ] Implement `Move()` — move file between status directories
+- [x] Create `internal/local/` package
+- [x] Implement task file parsing (YAML frontmatter + markdown body)
+- [x] Implement task file writing
+- [x] Implement `Name()` and `Version()` methods
+- [x] Implement `Connect()` — validate/create `.backlog/` structure
+- [x] Implement `List()` — scan all status directories
+- [x] Implement `Get()` — read single task file
+- [x] Implement `Create()` — generate ID, write file to `backlog/`
+- [x] Implement `Update()` — modify frontmatter/body
+- [x] Implement `Delete()` — remove task file
+- [x] Implement `Move()` — move file between status directories
 
 ### CLI Commands - Phase 1
 - [ ] Implement `backlog init` — create `.backlog/` directory structure
