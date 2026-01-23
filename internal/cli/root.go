@@ -1,19 +1,36 @@
 package cli
 
 import (
-	"fmt"
-	"os"
+	"github.com/spf13/cobra"
 )
+
+var (
+	// Global flags
+	workspace string
+	format    string
+	quiet     bool
+	verbose   bool
+)
+
+// rootCmd represents the base command when called without any subcommands
+var rootCmd = &cobra.Command{
+	Use:   "backlog",
+	Short: "A CLI tool for managing tasks across multiple issue tracking backends",
+	Long: `backlog is a command-line tool for managing tasks across multiple issue
+tracking backends. It provides a unified, agent-friendly interface that
+abstracts away provider-specific APIs, enabling both humans and AI agents
+to manage backlogs through simple, composable commands.`,
+}
 
 // Execute runs the CLI application.
 func Execute() error {
-	// Placeholder - will be replaced with Cobra implementation
-	if len(os.Args) > 1 && os.Args[1] == "version" {
-		fmt.Println("backlog version 0.1.0-dev")
-		return nil
-	}
-	fmt.Println("backlog - A CLI tool for managing tasks across multiple issue tracking backends")
-	fmt.Println("\nUsage: backlog <command> [flags]")
-	fmt.Println("\nUse 'backlog help' for more information about available commands.")
-	return nil
+	return rootCmd.Execute()
+}
+
+func init() {
+	// Global flags available to all commands
+	rootCmd.PersistentFlags().StringVarP(&workspace, "workspace", "w", "", "Target workspace (default: workspace with default: true)")
+	rootCmd.PersistentFlags().StringVarP(&format, "format", "f", "table", "Output format: table, json, plain, id-only")
+	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "Suppress non-essential output")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Show debug information")
 }

@@ -5,7 +5,7 @@
 ### Project Setup
 - [x] Initialize Go module (`go mod init`)
 - [x] Create directory structure (`cmd/backlog/`, `internal/`)
-- [ ] Set up Cobra CLI framework
+- [x] Set up Cobra CLI framework
 - [ ] Set up Viper for configuration
 
 ### Core Types & Interfaces
@@ -45,10 +45,10 @@
 - [ ] Implement `backlog edit <id>` with flags (`--title`, `--priority`, `--add-label`, `--remove-label`, `--description`)
 
 ### Global Flags
-- [ ] Implement `--workspace` / `-w` flag
-- [ ] Implement `--format` / `-f` flag
-- [ ] Implement `--quiet` / `-q` flag
-- [ ] Implement `--verbose` / `-v` flag
+- [x] Implement `--workspace` / `-w` flag
+- [x] Implement `--format` / `-f` flag
+- [x] Implement `--quiet` / `-q` flag
+- [x] Implement `--verbose` / `-v` flag
 
 ### Configuration
 - [ ] Implement config file loading (`~/.config/backlog/config.yaml`)
@@ -216,7 +216,7 @@
 
 | Phase | Status | Tasks |
 |-------|--------|-------|
-| Phase 1: Local CRUD | In Progress | 2/X |
+| Phase 1: Local CRUD | In Progress | 7/X |
 | Phase 2: Agent Coordination | Not Started | 0/X |
 | Phase 3: Git Sync | Not Started | 0/X |
 | Phase 4: GitHub Issues | Not Started | 0/X |
