@@ -71,11 +71,11 @@
 - [x] Add `agent_id` and `agent_label_prefix` to workspace config (already in config structure)
 
 ### File-Based Locking
-- [ ] Create `.locks/` directory structure
-- [ ] Implement lock file format (agent, claimed_at, expires_at)
-- [ ] Implement lock acquisition (atomic file creation)
-- [ ] Implement lock release
-- [ ] Implement stale lock detection (TTL expiry)
+- [x] Create `.locks/` directory structure (created by `backlog init`)
+- [x] Implement lock file format (agent, claimed_at, expires_at) — `internal/local/lock.go`
+- [x] Implement lock acquisition (atomic file creation) — `Claim()` method
+- [x] Implement lock release — `Release()` method
+- [x] Implement stale lock detection (TTL expiry) — `isActive()` method with 30-min default TTL
 - [ ] Add `lock_mode: file` config option
 
 ### CLI Commands - Phase 2
@@ -86,8 +86,8 @@
 - [ ] Implement `backlog next --label=<label>` — filtered next
 
 ### Conflict Handling
-- [ ] Return exit code 2 when task already claimed by another agent
-- [ ] Handle "already claimed by same agent" as success (no-op)
+- [x] Return exit code 2 when task already claimed by another agent — `ClaimConflictError` type
+- [x] Handle "already claimed by same agent" as success (no-op) — `AlreadyOwned` flag in `ClaimResult`
 
 ### Comments
 - [ ] Implement `backlog comment <id> <message>`
@@ -217,7 +217,7 @@
 | Phase | Status | Tasks |
 |-------|--------|-------|
 | Phase 1: Local CRUD | Complete | All done |
-| Phase 2: Agent Coordination | Not Started | 0/X |
+| Phase 2: Agent Coordination | In Progress | Backend locking done, CLI commands pending |
 | Phase 3: Git Sync | Not Started | 0/X |
 | Phase 4: GitHub Issues | Not Started | 0/X |
 | Phase 5: GitHub Projects | Not Started | 0/X |

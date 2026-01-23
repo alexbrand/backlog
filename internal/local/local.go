@@ -612,6 +612,154 @@ func priorityOrder(p backend.Priority) int {
 	}
 }
 
+// Claim claims a task for the current agent.
+// Implements the backend.Claimer interface.
+func (l *Local) Claim(id string, agentID string) (*backend.ClaimResult, error) {
+	if !l.connected {
+		return nil, errors.New("not connected")
+	}
+
+	// Use the provided agentID, or fall back to the configured one
+	if agentID == "" {
+		agentID = l.agentID
+	}
+
+	// Find the task
+	task, err := l.findTask(id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check for existing lock
+	existingLock, err := l.readLock(id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read lock: %w", err)
+	}
+
+	// Check if task is already claimed
+	if existingLock != nil && existingLock.isActive() {
+		// Check if claimed by the same agent
+		if existingLock.Agent == agentID {
+			return &backend.ClaimResult{
+				Task:         task,
+				AlreadyOwned: true,
+			}, nil
+		}
+		// Claimed by another agent
+		return nil, &ClaimConflictError{
+			TaskID:       id,
+			ClaimedBy:    existingLock.Agent,
+			CurrentAgent: agentID,
+		}
+	}
+
+	// Create new lock
+	now := time.Now().UTC()
+	lock := &LockFile{
+		Agent:     agentID,
+		ClaimedAt: now,
+		ExpiresAt: now.Add(DefaultLockTTL),
+	}
+
+	if err := l.writeLock(id, lock); err != nil {
+		return nil, fmt.Errorf("failed to write lock: %w", err)
+	}
+
+	// Remove any existing agent labels and add the new one
+	agentLabel := fmt.Sprintf("%s:%s", l.agentLabelPrefix, agentID)
+	changes := backend.TaskChanges{
+		RemoveLabels: l.findAgentLabels(task.Labels),
+		AddLabels:    []string{agentLabel},
+	}
+
+	// Move to in-progress and apply label changes
+	task, err = l.Update(id, changes)
+	if err != nil {
+		// Try to remove the lock if we fail to update the task
+		l.removeLock(id)
+		return nil, fmt.Errorf("failed to update task: %w", err)
+	}
+
+	task, err = l.Move(id, backend.StatusInProgress)
+	if err != nil {
+		// Try to remove the lock if we fail to move the task
+		l.removeLock(id)
+		return nil, fmt.Errorf("failed to move task: %w", err)
+	}
+
+	return &backend.ClaimResult{
+		Task:         task,
+		AlreadyOwned: false,
+	}, nil
+}
+
+// Release releases a claimed task back to todo status.
+// Implements the backend.Claimer interface.
+func (l *Local) Release(id string) error {
+	if !l.connected {
+		return errors.New("not connected")
+	}
+
+	// Find the task
+	task, err := l.findTask(id)
+	if err != nil {
+		return err
+	}
+
+	// Remove the lock file
+	if err := l.removeLock(id); err != nil {
+		return fmt.Errorf("failed to remove lock: %w", err)
+	}
+
+	// Remove agent labels
+	agentLabels := l.findAgentLabels(task.Labels)
+	if len(agentLabels) > 0 {
+		_, err = l.Update(id, backend.TaskChanges{
+			RemoveLabels: agentLabels,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to remove agent labels: %w", err)
+		}
+	}
+
+	// Unassign the task
+	_, err = l.Unassign(id)
+	if err != nil {
+		return fmt.Errorf("failed to unassign task: %w", err)
+	}
+
+	// Move to todo
+	_, err = l.Move(id, backend.StatusTodo)
+	if err != nil {
+		return fmt.Errorf("failed to move task to todo: %w", err)
+	}
+
+	return nil
+}
+
+// findAgentLabels returns all labels that match the agent label pattern.
+func (l *Local) findAgentLabels(labels []string) []string {
+	var agentLabels []string
+	prefix := l.agentLabelPrefix + ":"
+	for _, label := range labels {
+		if strings.HasPrefix(label, prefix) {
+			agentLabels = append(agentLabels, label)
+		}
+	}
+	return agentLabels
+}
+
+// ClaimConflictError represents an error when a task is already claimed by another agent.
+type ClaimConflictError struct {
+	TaskID       string
+	ClaimedBy    string
+	CurrentAgent string
+}
+
+func (e *ClaimConflictError) Error() string {
+	return fmt.Sprintf("task %s is already claimed by agent %s", e.TaskID, e.ClaimedBy)
+}
+
 // Register registers the local backend with the registry.
 func Register() {
 	backend.Register(Name, func() backend.Backend {
