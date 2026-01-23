@@ -110,8 +110,8 @@
 - [x] Implement conflict detection via failed push (exit code 2)
 
 ### Git-Based Claims
-- [ ] Implement claim via pull → commit → push
-- [ ] Handle push failure as conflict
+- [x] Implement claim via pull → commit → push
+- [x] Handle push failure as conflict
 
 ---
 
@@ -218,7 +218,7 @@
 |-------|--------|-------|
 | Phase 1: Local CRUD | Complete | All done |
 | Phase 2: Agent Coordination | Complete | All done |
-| Phase 3: Git Sync | In Progress | 7/9 |
+| Phase 3: Git Sync | Complete | All done |
 | Phase 4: GitHub Issues | Not Started | 0/X |
 | Phase 5: GitHub Projects | Not Started | 0/X |
 | Phase 6: Linear | Not Started | 0/X |

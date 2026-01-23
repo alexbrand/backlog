@@ -704,6 +704,99 @@ func (l *Local) Claim(id string, agentID string) (*backend.ClaimResult, error) {
 		l.agentID = agentID
 	}
 
+	// Git mode: pull → check → claim → commit → push
+	if l.lockMode == LockModeGit {
+		return l.claimWithGit(id, agentID)
+	}
+
+	// File mode: use file-based locking
+	return l.claimWithFileLock(id, agentID)
+}
+
+// claimWithGit implements git-based claim coordination.
+// Flow: pull latest → check agent labels → make changes → commit → push
+// Push failures indicate another agent claimed the task first (exit code 2).
+func (l *Local) claimWithGit(id string, agentID string) (*backend.ClaimResult, error) {
+	// Pull latest changes from remote
+	if err := l.gitPull(); err != nil {
+		return nil, fmt.Errorf("failed to pull: %w", err)
+	}
+
+	// Find the task (re-read after pull to get latest state)
+	task, err := l.findTask(id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if task is already claimed by checking agent labels
+	existingAgentLabels := l.findAgentLabels(task.Labels)
+	if len(existingAgentLabels) > 0 {
+		// Extract agent ID from label (format: "agent:agent-id")
+		claimedByAgent := strings.TrimPrefix(existingAgentLabels[0], l.agentLabelPrefix+":")
+		if claimedByAgent == agentID {
+			return &backend.ClaimResult{
+				Task:         task,
+				AlreadyOwned: true,
+			}, nil
+		}
+		// Claimed by another agent
+		return nil, &ClaimConflictError{
+			TaskID:       id,
+			ClaimedBy:    claimedByAgent,
+			CurrentAgent: agentID,
+		}
+	}
+
+	// Clean up any stale file locks (git mode doesn't use them)
+	l.removeLock(id)
+
+	// Remove any existing agent labels, add the new one, and set assignee to agent ID
+	agentLabel := fmt.Sprintf("%s:%s", l.agentLabelPrefix, agentID)
+	changes := backend.TaskChanges{
+		RemoveLabels: existingAgentLabels,
+		AddLabels:    []string{agentLabel},
+		Assignee:     &agentID,
+	}
+
+	// Apply label changes
+	task, err = l.updateInternal(id, changes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update task: %w", err)
+	}
+
+	// Move to in-progress
+	task, err = l.moveInternal(id, backend.StatusInProgress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to move task: %w", err)
+	}
+
+	// Commit the changes
+	if err := l.gitCommit("claim", id); err != nil {
+		return nil, fmt.Errorf("failed to commit: %w", err)
+	}
+
+	// Push to remote - this is the coordination point
+	// If push fails with non-fast-forward, another agent claimed first
+	if err := l.gitPush(); err != nil {
+		// Check if it's a push conflict (another agent beat us)
+		if _, isConflict := err.(*GitPushConflictError); isConflict {
+			return nil, &ClaimConflictError{
+				TaskID:       id,
+				ClaimedBy:    "another agent (push conflict)",
+				CurrentAgent: agentID,
+			}
+		}
+		return nil, fmt.Errorf("failed to push: %w", err)
+	}
+
+	return &backend.ClaimResult{
+		Task:         task,
+		AlreadyOwned: false,
+	}, nil
+}
+
+// claimWithFileLock implements file-based claim coordination.
+func (l *Local) claimWithFileLock(id string, agentID string) (*backend.ClaimResult, error) {
 	// Find the task
 	task, err := l.findTask(id)
 	if err != nil {
@@ -786,6 +879,74 @@ func (l *Local) Release(id string) error {
 		return errors.New("not connected")
 	}
 
+	// Git mode: pull → release → commit → push
+	if l.lockMode == LockModeGit {
+		return l.releaseWithGit(id)
+	}
+
+	// File mode: use file-based locking
+	return l.releaseWithFileLock(id)
+}
+
+// releaseWithGit implements git-based release coordination.
+// Flow: pull latest → make changes → commit → push
+func (l *Local) releaseWithGit(id string) error {
+	// Pull latest changes from remote
+	if err := l.gitPull(); err != nil {
+		return fmt.Errorf("failed to pull: %w", err)
+	}
+
+	// Find the task (re-read after pull to get latest state)
+	task, err := l.findTask(id)
+	if err != nil {
+		return err
+	}
+
+	// Clean up any stale file locks (git mode doesn't use them)
+	l.removeLock(id)
+
+	// Remove agent labels
+	agentLabels := l.findAgentLabels(task.Labels)
+	if len(agentLabels) > 0 {
+		_, err = l.updateInternal(id, backend.TaskChanges{
+			RemoveLabels: agentLabels,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to remove agent labels: %w", err)
+		}
+	}
+
+	// Unassign the task (uses updateInternal internally)
+	_, err = l.Unassign(id)
+	if err != nil {
+		return fmt.Errorf("failed to unassign task: %w", err)
+	}
+
+	// Move to todo
+	_, err = l.moveInternal(id, backend.StatusTodo)
+	if err != nil {
+		return fmt.Errorf("failed to move task to todo: %w", err)
+	}
+
+	// Commit the changes
+	if err := l.gitCommit("release", id); err != nil {
+		return fmt.Errorf("failed to commit: %w", err)
+	}
+
+	// Push to remote
+	if err := l.gitPush(); err != nil {
+		// For release, a push conflict is still an error but not the same as claim conflict
+		if _, isConflict := err.(*GitPushConflictError); isConflict {
+			return fmt.Errorf("failed to push release: remote has conflicting changes")
+		}
+		return fmt.Errorf("failed to push: %w", err)
+	}
+
+	return nil
+}
+
+// releaseWithFileLock implements file-based release coordination.
+func (l *Local) releaseWithFileLock(id string) error {
 	// Find the task
 	task, err := l.findTask(id)
 	if err != nil {
@@ -891,6 +1052,76 @@ func (l *Local) gitCommit(action, taskID string) error {
 	}
 
 	return nil
+}
+
+// gitPull pulls changes from the remote repository.
+// Returns an error if pull fails or has conflicts.
+func (l *Local) gitPull() error {
+	gitDir := filepath.Dir(l.path)
+
+	pullCmd := exec.Command("git", "pull")
+	pullCmd.Dir = gitDir
+	pullOutput, err := pullCmd.CombinedOutput()
+	if err != nil {
+		outputStr := string(pullOutput)
+		// Check for conflicts
+		if strings.Contains(outputStr, "CONFLICT") || strings.Contains(outputStr, "conflict") {
+			return &SyncConflictError{
+				Operation: "pull",
+				Message:   outputStr,
+			}
+		}
+		// Check if it's just "already up to date"
+		if !strings.Contains(outputStr, "Already up to date") &&
+			!strings.Contains(outputStr, "Already up-to-date") {
+			return fmt.Errorf("git pull failed: %w\n%s", err, outputStr)
+		}
+	}
+	return nil
+}
+
+// gitPush pushes changes to the remote repository.
+// Returns a ClaimConflictError if push is rejected (for use with git-based claims).
+func (l *Local) gitPush() error {
+	gitDir := filepath.Dir(l.path)
+
+	pushCmd := exec.Command("git", "push")
+	pushCmd.Dir = gitDir
+	pushOutput, err := pushCmd.CombinedOutput()
+	if err != nil {
+		outputStr := string(pushOutput)
+		// Check for rejection (conflict)
+		if strings.Contains(outputStr, "rejected") ||
+			strings.Contains(outputStr, "non-fast-forward") {
+			return &GitPushConflictError{
+				Message: "push rejected - remote has changes that conflict with local changes",
+			}
+		}
+		// Check for remote connectivity issues
+		if strings.Contains(outputStr, "Could not read from remote") ||
+			strings.Contains(outputStr, "unable to access") ||
+			strings.Contains(outputStr, "fatal: unable to") ||
+			strings.Contains(outputStr, "Connection refused") {
+			return fmt.Errorf("git push failed: remote unreachable\n%s", outputStr)
+		}
+		// Check if there's nothing to push (not an error)
+		if !strings.Contains(outputStr, "Everything up-to-date") &&
+			!strings.Contains(outputStr, "nothing to commit") {
+			return fmt.Errorf("git push failed: %w\n%s", err, outputStr)
+		}
+	}
+	return nil
+}
+
+// GitPushConflictError represents a conflict when pushing to remote.
+// This is returned when a git push is rejected due to non-fast-forward updates,
+// indicating another agent has pushed changes since we last pulled.
+type GitPushConflictError struct {
+	Message string
+}
+
+func (e *GitPushConflictError) Error() string {
+	return fmt.Sprintf("git push conflict: %s", e.Message)
 }
 
 // Sync synchronizes the local backlog with a remote git repository.
