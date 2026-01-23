@@ -62,7 +62,7 @@ This plan covers implementing a Gherkin-based executable specification using [go
 ### Feature: Listing Tasks (`list.feature`)
 - [x] Scenario: List all tasks (excludes done by default)
 - [x] Scenario: List tasks in table format (default)
-- [ ] Scenario: List tasks in JSON format
+- [x] Scenario: List tasks in JSON format
 - [ ] Scenario: List tasks in plain format
 - [ ] Scenario: List tasks in id-only format
 - [ ] Scenario: List with status filter

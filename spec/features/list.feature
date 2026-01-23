@@ -44,3 +44,23 @@ Feature: Listing Tasks
     And stdout should contain "low"
     And stdout should contain "Third task"
     And stdout should contain "bob"
+
+  Scenario: List tasks in JSON format
+    Given a backlog with the following tasks:
+      | id    | title           | status      | priority | assignee | labels        |
+      | task1 | First task      | todo        | high     | alice    | feature,api   |
+      | task2 | Second task     | in-progress | medium   |          | bug           |
+      | task3 | Third task      | backlog     | low      | bob      |               |
+    When I run "backlog list -f json"
+    Then the exit code should be 0
+    And the JSON output should be valid
+    And the JSON output should have "tasks" as an array
+    And the JSON output should have "count" equal to "3"
+    And the JSON output should have "hasMore" equal to "false"
+    And the JSON output should have "tasks[0].id" equal to "task1"
+    And the JSON output should have "tasks[0].title" equal to "First task"
+    And the JSON output should have "tasks[0].status" equal to "todo"
+    And the JSON output should have "tasks[0].priority" equal to "high"
+    And the JSON output should have "tasks[0].assignee" equal to "alice"
+    And the JSON output should have array "tasks[0].labels" containing "feature"
+    And the JSON output should have array "tasks[0].labels" containing "api"

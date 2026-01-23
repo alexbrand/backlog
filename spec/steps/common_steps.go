@@ -103,6 +103,9 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the created task should have description containing "([^"]*)"$`, theCreatedTaskShouldHaveDescriptionContaining)
 	ctx.Step(`^the task count should be (\d+)$`, theTaskCountShouldBe)
 	ctx.Step(`^stdout should match pattern "([^"]*)"$`, stdoutShouldMatchPattern)
+	ctx.Step(`^the JSON output should be valid$`, theJSONOutputShouldBeValid)
+	ctx.Step(`^the JSON output should have "([^"]*)" as an array$`, theJSONOutputShouldHaveAsAnArray)
+	ctx.Step(`^the JSON output should have array "([^"]*)" containing "([^"]*)"$`, theJSONOutputShouldHaveArrayContaining)
 }
 
 // aFreshBacklogDirectory creates a new empty .backlog directory.
@@ -502,6 +505,60 @@ func stdoutShouldMatchPattern(ctx context.Context, pattern string) error {
 
 	if !re.MatchString(result.Stdout) {
 		return fmt.Errorf("expected stdout to match pattern %q, got:\n%s", pattern, result.Stdout)
+	}
+
+	return nil
+}
+
+// theJSONOutputShouldBeValid verifies that stdout is valid JSON.
+func theJSONOutputShouldBeValid(ctx context.Context) error {
+	result := getLastResult(ctx)
+	if result == nil {
+		return fmt.Errorf("no command has been run")
+	}
+
+	jsonResult := support.ParseJSON(result.Stdout)
+	if !jsonResult.Valid() {
+		return fmt.Errorf("stdout is not valid JSON: %s\nstdout:\n%s", jsonResult.Error(), result.Stdout)
+	}
+
+	return nil
+}
+
+// theJSONOutputShouldHaveAsAnArray verifies a JSON path contains an array.
+func theJSONOutputShouldHaveAsAnArray(ctx context.Context, path string) error {
+	result := getLastResult(ctx)
+	if result == nil {
+		return fmt.Errorf("no command has been run")
+	}
+
+	jsonResult := support.ParseJSON(result.Stdout)
+	if !jsonResult.Valid() {
+		return fmt.Errorf("stdout is not valid JSON: %s\nstdout:\n%s", jsonResult.Error(), result.Stdout)
+	}
+
+	if !jsonResult.IsArray(path) {
+		return fmt.Errorf("expected JSON path %q to be an array, but it is not\nstdout:\n%s", path, result.Stdout)
+	}
+
+	return nil
+}
+
+// theJSONOutputShouldHaveArrayContaining verifies an array at a JSON path contains a value.
+func theJSONOutputShouldHaveArrayContaining(ctx context.Context, path, expected string) error {
+	result := getLastResult(ctx)
+	if result == nil {
+		return fmt.Errorf("no command has been run")
+	}
+
+	jsonResult := support.ParseJSON(result.Stdout)
+	if !jsonResult.Valid() {
+		return fmt.Errorf("stdout is not valid JSON: %s\nstdout:\n%s", jsonResult.Error(), result.Stdout)
+	}
+
+	if !jsonResult.ContainsString(path, expected) {
+		arr := jsonResult.GetArray(path)
+		return fmt.Errorf("expected JSON array at %q to contain %q, but it contains: %v", path, expected, arr)
 	}
 
 	return nil
