@@ -17,11 +17,11 @@
 - [x] Create backend registry in `internal/backend/registry.go`
 
 ### Output Formatters
-- [ ] Create formatter interface in `internal/output/`
-- [ ] Implement `table` formatter (default)
-- [ ] Implement `json` formatter
-- [ ] Implement `plain` formatter
-- [ ] Implement `id-only` formatter
+- [x] Create formatter interface in `internal/output/`
+- [x] Implement `table` formatter (default)
+- [x] Implement `json` formatter
+- [x] Implement `plain` formatter
+- [x] Implement `id-only` formatter
 
 ### Local Backend Implementation
 - [ ] Create `internal/local/` package
@@ -216,7 +216,7 @@
 
 | Phase | Status | Tasks |
 |-------|--------|-------|
-| Phase 1: Local CRUD | In Progress | 10/X |
+| Phase 1: Local CRUD | In Progress | 15/X |
 | Phase 2: Agent Coordination | Not Started | 0/X |
 | Phase 3: Git Sync | Not Started | 0/X |
 | Phase 4: GitHub Issues | Not Started | 0/X |
