@@ -69,8 +69,13 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 		return ctx, nil
 	})
 
-	// After each scenario: clean up test environment
+	// After each scenario: clean up test environment and mock server
 	ctx.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
+		// Clean up mock GitHub server if running
+		if server := getMockGitHubServer(ctx); server != nil {
+			server.Close()
+		}
+
 		env := getTestEnv(ctx)
 		if env != nil {
 			if cleanupErr := env.Cleanup(); cleanupErr != nil {
@@ -2304,45 +2309,65 @@ func theRemoteRepositoryIsUnreachable(ctx context.Context) (context.Context, err
 // ============================================================================
 
 const (
-	mockGitHubServerKey   contextKey = "mockGitHubServer"
-	mockGitHubIssuesKey   contextKey = "mockGitHubIssues"
-	mockGitHubExpectToken contextKey = "mockGitHubExpectToken"
-	mockGitHubAuthError   contextKey = "mockGitHubAuthError"
+	mockGitHubServerKey contextKey = "mockGitHubServer"
 )
 
-// MockGitHubIssue represents an issue in the mock GitHub API.
-type MockGitHubIssue struct {
-	Number   int
-	Title    string
-	State    string
-	Labels   []string
-	Assignee string
-	Body     string
+// getMockGitHubServer retrieves the MockGitHubServer from context.
+func getMockGitHubServer(ctx context.Context) *support.MockGitHubServer {
+	if server, ok := ctx.Value(mockGitHubServerKey).(*support.MockGitHubServer); ok {
+		return server
+	}
+	return nil
 }
 
 // aMockGitHubAPIServerIsRunning starts a mock GitHub API server.
 func aMockGitHubAPIServerIsRunning(ctx context.Context) (context.Context, error) {
-	// For now, this is a placeholder that marks the mock server as "running"
-	// The actual mock server implementation will be added when the GitHub backend is implemented
-	// The CLI will need to be configured to point to the mock server URL
-	ctx = context.WithValue(ctx, mockGitHubServerKey, true)
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	// Create and start the mock server
+	server := support.NewMockGitHubServer()
+
+	// Set the GITHUB_API_URL environment variable to point to the mock server
+	env.SetEnv("GITHUB_API_URL", server.URL)
+
+	// Store the server in context for cleanup and configuration
+	ctx = context.WithValue(ctx, mockGitHubServerKey, server)
+
 	return ctx, nil
 }
 
 // theMockGitHubAPIReturnsAuthErrorForInvalidTokens configures the mock to return auth errors.
 func theMockGitHubAPIReturnsAuthErrorForInvalidTokens(ctx context.Context) (context.Context, error) {
-	ctx = context.WithValue(ctx, mockGitHubAuthError, true)
+	server := getMockGitHubServer(ctx)
+	if server == nil {
+		return ctx, fmt.Errorf("mock GitHub API server not running - call 'a mock GitHub API server is running' first")
+	}
+
+	server.AuthErrorEnabled = true
 	return ctx, nil
 }
 
 // theMockGitHubAPIExpectsToken configures the mock to expect a specific token.
 func theMockGitHubAPIExpectsToken(ctx context.Context, token string) (context.Context, error) {
-	ctx = context.WithValue(ctx, mockGitHubExpectToken, token)
+	server := getMockGitHubServer(ctx)
+	if server == nil {
+		return ctx, fmt.Errorf("mock GitHub API server not running - call 'a mock GitHub API server is running' first")
+	}
+
+	server.ExpectedToken = token
 	return ctx, nil
 }
 
 // theMockGitHubAPIHasTheFollowingIssues sets up mock issues for the GitHub API.
 func theMockGitHubAPIHasTheFollowingIssues(ctx context.Context, table *godog.Table) (context.Context, error) {
+	server := getMockGitHubServer(ctx)
+	if server == nil {
+		return ctx, fmt.Errorf("mock GitHub API server not running - call 'a mock GitHub API server is running' first")
+	}
+
 	if len(table.Rows) < 2 {
 		return ctx, fmt.Errorf("table must have at least a header row and one data row")
 	}
@@ -2353,7 +2378,7 @@ func theMockGitHubAPIHasTheFollowingIssues(ctx context.Context, table *godog.Tab
 		colIndex[cell.Value] = i
 	}
 
-	var issues []MockGitHubIssue
+	var issues []support.MockGitHubIssue
 	for _, row := range table.Rows[1:] {
 		getValue := func(col string) string {
 			if idx, ok := colIndex[col]; ok && idx < len(row.Cells) {
@@ -2362,7 +2387,7 @@ func theMockGitHubAPIHasTheFollowingIssues(ctx context.Context, table *godog.Tab
 			return ""
 		}
 
-		issue := MockGitHubIssue{
+		issue := support.MockGitHubIssue{
 			Title:    getValue("title"),
 			State:    getValue("state"),
 			Assignee: getValue("assignee"),
@@ -2387,7 +2412,8 @@ func theMockGitHubAPIHasTheFollowingIssues(ctx context.Context, table *godog.Tab
 		issues = append(issues, issue)
 	}
 
-	ctx = context.WithValue(ctx, mockGitHubIssuesKey, issues)
+	// Set the issues on the mock server
+	server.SetIssues(issues)
 	return ctx, nil
 }
 
@@ -2440,26 +2466,24 @@ func theEnvironmentVariableIsSetToAValidToken(ctx context.Context, key string) (
 	return ctx, nil
 }
 
-// MockGitHubComment represents a comment on a GitHub issue.
-type MockGitHubComment struct {
-	Author string
-	Body   string
-}
-
-// mockGitHubCommentsKey is the context key for storing mock issue comments.
-const mockGitHubCommentsKey contextKey = "mockGitHubComments"
-
-// mockGitHubAuthenticatedUserKey is the context key for storing the mock authenticated user.
-const mockGitHubAuthenticatedUserKey contextKey = "mockGitHubAuthenticatedUser"
-
 // theMockGitHubAPIAuthenticatedUserIs sets the authenticated user for the mock GitHub API.
 func theMockGitHubAPIAuthenticatedUserIs(ctx context.Context, username string) (context.Context, error) {
-	ctx = context.WithValue(ctx, mockGitHubAuthenticatedUserKey, username)
+	server := getMockGitHubServer(ctx)
+	if server == nil {
+		return ctx, fmt.Errorf("mock GitHub API server not running - call 'a mock GitHub API server is running' first")
+	}
+
+	server.AuthenticatedUser = username
 	return ctx, nil
 }
 
 // theMockGitHubIssueHasTheFollowingComments sets up mock comments for a specific GitHub issue.
 func theMockGitHubIssueHasTheFollowingComments(ctx context.Context, issueNumber string, table *godog.Table) (context.Context, error) {
+	server := getMockGitHubServer(ctx)
+	if server == nil {
+		return ctx, fmt.Errorf("mock GitHub API server not running - call 'a mock GitHub API server is running' first")
+	}
+
 	if len(table.Rows) < 2 {
 		return ctx, fmt.Errorf("table must have at least a header row and one data row")
 	}
@@ -2470,7 +2494,7 @@ func theMockGitHubIssueHasTheFollowingComments(ctx context.Context, issueNumber 
 		colIndex[cell.Value] = i
 	}
 
-	var comments []MockGitHubComment
+	var comments []support.MockGitHubComment
 	for _, row := range table.Rows[1:] {
 		getValue := func(col string) string {
 			if idx, ok := colIndex[col]; ok && idx < len(row.Cells) {
@@ -2479,7 +2503,7 @@ func theMockGitHubIssueHasTheFollowingComments(ctx context.Context, issueNumber 
 			return ""
 		}
 
-		comment := MockGitHubComment{
+		comment := support.MockGitHubComment{
 			Author: getValue("author"),
 			Body:   getValue("body"),
 		}
@@ -2487,14 +2511,12 @@ func theMockGitHubIssueHasTheFollowingComments(ctx context.Context, issueNumber 
 		comments = append(comments, comment)
 	}
 
-	// Store comments in a map keyed by issue number
-	commentsMap := make(map[string][]MockGitHubComment)
-	if existing, ok := ctx.Value(mockGitHubCommentsKey).(map[string][]MockGitHubComment); ok {
-		commentsMap = existing
-	}
-	commentsMap[issueNumber] = comments
+	// Parse issue number
+	var issueNum int
+	fmt.Sscanf(issueNumber, "%d", &issueNum)
 
-	ctx = context.WithValue(ctx, mockGitHubCommentsKey, commentsMap)
+	// Set the comments on the mock server
+	server.SetComments(issueNum, comments)
 	return ctx, nil
 }
 

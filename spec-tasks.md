@@ -289,7 +289,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: Show with --comments fetches comment thread
 
 ### Step Definitions - Phase 4
-- [ ] Implement mock GitHub API server for testing
+- [x] Implement mock GitHub API server for testing
 - [ ] Implement "Given a GitHub repository {string} with issues:"
 - [ ] Implement "Given the GitHub token is {string}"
 - [ ] Implement "Then the GitHub issue {string} should have label {string}"
