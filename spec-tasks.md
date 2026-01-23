@@ -133,8 +133,8 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: JSON error output format
 
 ### Feature: Plain Output (`output_plain.feature`)
-- [ ] Scenario: Plain output shows one task per line
-- [ ] Scenario: Plain output format for show command
+- [x] Scenario: Plain output shows one task per line
+- [x] Scenario: Plain output format for show command
 
 ---
 
