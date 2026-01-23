@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -152,6 +153,22 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^task "([^"]*)" has a stale lock from agent "([^"]*)" that expired (\d+) hour(?:s)? ago$`, taskHasStaleLockHoursAgo)
 	ctx.Step(`^task "([^"]*)" has a lock from agent "([^"]*)" that expired (\d+) minute(?:s)? ago$`, taskHasExpiredLockMinutesAgo)
 	ctx.Step(`^task "([^"]*)" has an active lock from agent "([^"]*)"$`, taskHasActiveLock)
+
+	// Git sync setup steps
+	ctx.Step(`^a git repository is initialized$`, aGitRepositoryIsInitialized)
+	ctx.Step(`^git_sync is enabled in the config$`, gitSyncIsEnabledInTheConfig)
+	ctx.Step(`^git_sync is disabled in the config$`, gitSyncIsDisabledInTheConfig)
+	ctx.Step(`^a remote git repository$`, aRemoteGitRepository)
+	ctx.Step(`^the remote has different content than local$`, theRemoteHasDifferentContentThanLocal)
+	ctx.Step(`^the remote has been updated by another agent$`, theRemoteHasBeenUpdatedByAnotherAgent)
+	ctx.Step(`^there are uncommitted changes in the repository$`, thereAreUncommittedChangesInTheRepository)
+
+	// Git sync verification steps
+	ctx.Step(`^a git commit should exist with message containing "([^"]*)"$`, aGitCommitShouldExistWithMessageContaining)
+	ctx.Step(`^the last git commit message should match pattern "([^"]*)"$`, theLastGitCommitMessageShouldMatchPattern)
+	ctx.Step(`^the local repository should be in sync with remote$`, theLocalRepositoryShouldBeInSyncWithRemote)
+	ctx.Step(`^the local repository should match the remote$`, theLocalRepositoryShouldMatchTheRemote)
+	ctx.Step(`^no new git commits should exist$`, noNewGitCommitsShouldExist)
 }
 
 // aFreshBacklogDirectory creates a new empty .backlog directory.
@@ -1494,4 +1511,402 @@ func taskHasActiveLock(ctx context.Context, taskID, agentID string) (context.Con
 	}
 
 	return ctx, nil
+}
+
+// ============================================================================
+// Git Sync Step Definitions
+// ============================================================================
+
+const (
+	initialCommitCountKey contextKey = "initialCommitCount"
+	remoteRepoPathKey     contextKey = "remoteRepoPath"
+)
+
+// aGitRepositoryIsInitialized initializes a git repository in the test environment.
+func aGitRepositoryIsInitialized(ctx context.Context) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	// Initialize git repository
+	cmd := exec.Command("git", "init")
+	cmd.Dir = env.TempDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ctx, fmt.Errorf("failed to initialize git repository: %w\nOutput: %s", err, output)
+	}
+
+	// Configure git user for commits
+	cmd = exec.Command("git", "config", "user.email", "test@example.com")
+	cmd.Dir = env.TempDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ctx, fmt.Errorf("failed to configure git email: %w\nOutput: %s", err, output)
+	}
+
+	cmd = exec.Command("git", "config", "user.name", "Test User")
+	cmd.Dir = env.TempDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ctx, fmt.Errorf("failed to configure git name: %w\nOutput: %s", err, output)
+	}
+
+	return ctx, nil
+}
+
+// gitSyncIsEnabledInTheConfig creates a config with git_sync enabled.
+func gitSyncIsEnabledInTheConfig(ctx context.Context) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	configContent := `version: 1
+defaults:
+  format: table
+  workspace: local
+workspaces:
+  local:
+    backend: local
+    path: ./.backlog
+    default: true
+    lock_mode: git
+    git_sync: true
+`
+	if err := env.CreateFile(".backlog/config.yaml", configContent); err != nil {
+		return ctx, fmt.Errorf("failed to create config file: %w", err)
+	}
+
+	// Add and commit the initial state
+	cmd := exec.Command("git", "add", "-A")
+	cmd.Dir = env.TempDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ctx, fmt.Errorf("failed to git add: %w\nOutput: %s", err, output)
+	}
+
+	cmd = exec.Command("git", "commit", "-m", "Initial commit")
+	cmd.Dir = env.TempDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ctx, fmt.Errorf("failed to git commit: %w\nOutput: %s", err, output)
+	}
+
+	// Store the initial commit count
+	count, err := getGitCommitCount(env.TempDir)
+	if err != nil {
+		return ctx, fmt.Errorf("failed to get commit count: %w", err)
+	}
+	ctx = context.WithValue(ctx, initialCommitCountKey, count)
+
+	return ctx, nil
+}
+
+// gitSyncIsDisabledInTheConfig creates a config with git_sync disabled.
+func gitSyncIsDisabledInTheConfig(ctx context.Context) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	configContent := `version: 1
+defaults:
+  format: table
+  workspace: local
+workspaces:
+  local:
+    backend: local
+    path: ./.backlog
+    default: true
+    lock_mode: file
+    git_sync: false
+`
+	if err := env.CreateFile(".backlog/config.yaml", configContent); err != nil {
+		return ctx, fmt.Errorf("failed to create config file: %w", err)
+	}
+
+	// Add and commit the initial state
+	cmd := exec.Command("git", "add", "-A")
+	cmd.Dir = env.TempDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ctx, fmt.Errorf("failed to git add: %w\nOutput: %s", err, output)
+	}
+
+	cmd = exec.Command("git", "commit", "-m", "Initial commit")
+	cmd.Dir = env.TempDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ctx, fmt.Errorf("failed to git commit: %w\nOutput: %s", err, output)
+	}
+
+	// Store the initial commit count
+	count, err := getGitCommitCount(env.TempDir)
+	if err != nil {
+		return ctx, fmt.Errorf("failed to get commit count: %w", err)
+	}
+	ctx = context.WithValue(ctx, initialCommitCountKey, count)
+
+	return ctx, nil
+}
+
+// aGitCommitShouldExistWithMessageContaining verifies a git commit exists with a message containing the substring.
+func aGitCommitShouldExistWithMessageContaining(ctx context.Context, expected string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	// Get the last few commit messages
+	cmd := exec.Command("git", "log", "--oneline", "-10")
+	cmd.Dir = env.TempDir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to get git log: %w\nOutput: %s", err, output)
+	}
+
+	if !strings.Contains(string(output), expected) {
+		return fmt.Errorf("expected git log to contain commit message with %q, got:\n%s", expected, output)
+	}
+
+	return nil
+}
+
+// theLastGitCommitMessageShouldMatchPattern verifies the last commit message matches a pattern.
+func theLastGitCommitMessageShouldMatchPattern(ctx context.Context, pattern string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	// Get the last commit message
+	cmd := exec.Command("git", "log", "-1", "--format=%s")
+	cmd.Dir = env.TempDir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to get last git commit message: %w\nOutput: %s", err, output)
+	}
+
+	message := strings.TrimSpace(string(output))
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return fmt.Errorf("invalid pattern %q: %w", pattern, err)
+	}
+
+	if !re.MatchString(message) {
+		return fmt.Errorf("expected last commit message to match pattern %q, got: %q", pattern, message)
+	}
+
+	return nil
+}
+
+// aRemoteGitRepository sets up a bare git repository as a remote.
+func aRemoteGitRepository(ctx context.Context) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	// Create a bare repository in a temporary location
+	remoteDir, err := os.MkdirTemp("", "backlog-remote-*")
+	if err != nil {
+		return ctx, fmt.Errorf("failed to create remote directory: %w", err)
+	}
+
+	cmd := exec.Command("git", "init", "--bare")
+	cmd.Dir = remoteDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ctx, fmt.Errorf("failed to initialize bare repository: %w\nOutput: %s", err, output)
+	}
+
+	// Add the remote to the local repository
+	cmd = exec.Command("git", "remote", "add", "origin", remoteDir)
+	cmd.Dir = env.TempDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ctx, fmt.Errorf("failed to add remote: %w\nOutput: %s", err, output)
+	}
+
+	// Push the current state to the remote
+	cmd = exec.Command("git", "push", "-u", "origin", "master")
+	cmd.Dir = env.TempDir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// Try main branch instead of master
+		cmd = exec.Command("git", "push", "-u", "origin", "main")
+		cmd.Dir = env.TempDir
+		if output2, err2 := cmd.CombinedOutput(); err2 != nil {
+			return ctx, fmt.Errorf("failed to push to remote: %w\nOutput: %s\nAlternate: %s", err, output, output2)
+		}
+	}
+
+	ctx = context.WithValue(ctx, remoteRepoPathKey, remoteDir)
+
+	return ctx, nil
+}
+
+// theLocalRepositoryShouldBeInSyncWithRemote verifies local and remote are in sync.
+func theLocalRepositoryShouldBeInSyncWithRemote(ctx context.Context) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	// Fetch from remote
+	cmd := exec.Command("git", "fetch", "origin")
+	cmd.Dir = env.TempDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to fetch from remote: %w\nOutput: %s", err, output)
+	}
+
+	// Check if local and remote are at the same commit
+	cmd = exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = env.TempDir
+	localHead, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to get local HEAD: %w", err)
+	}
+
+	// Try main or master
+	cmd = exec.Command("git", "rev-parse", "origin/main")
+	cmd.Dir = env.TempDir
+	remoteHead, err := cmd.Output()
+	if err != nil {
+		cmd = exec.Command("git", "rev-parse", "origin/master")
+		cmd.Dir = env.TempDir
+		remoteHead, err = cmd.Output()
+		if err != nil {
+			return fmt.Errorf("failed to get remote HEAD: %w", err)
+		}
+	}
+
+	if strings.TrimSpace(string(localHead)) != strings.TrimSpace(string(remoteHead)) {
+		return fmt.Errorf("local HEAD (%s) does not match remote HEAD (%s)",
+			strings.TrimSpace(string(localHead)), strings.TrimSpace(string(remoteHead)))
+	}
+
+	return nil
+}
+
+// theRemoteHasDifferentContentThanLocal modifies the remote to have different content.
+func theRemoteHasDifferentContentThanLocal(ctx context.Context) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	remotePath, ok := ctx.Value(remoteRepoPathKey).(string)
+	if !ok || remotePath == "" {
+		return ctx, fmt.Errorf("remote repository path not found in context")
+	}
+
+	// Clone the remote to a temp directory, make changes, and push
+	cloneDir, err := os.MkdirTemp("", "backlog-clone-*")
+	if err != nil {
+		return ctx, fmt.Errorf("failed to create clone directory: %w", err)
+	}
+	defer os.RemoveAll(cloneDir)
+
+	cmd := exec.Command("git", "clone", remotePath, cloneDir)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ctx, fmt.Errorf("failed to clone remote: %w\nOutput: %s", err, output)
+	}
+
+	// Configure git user
+	cmd = exec.Command("git", "config", "user.email", "remote@example.com")
+	cmd.Dir = cloneDir
+	cmd.CombinedOutput()
+	cmd = exec.Command("git", "config", "user.name", "Remote User")
+	cmd.Dir = cloneDir
+	cmd.CombinedOutput()
+
+	// Create a new file
+	if err := os.WriteFile(filepath.Join(cloneDir, "remote-change.txt"), []byte("Remote change"), 0644); err != nil {
+		return ctx, fmt.Errorf("failed to create remote change file: %w", err)
+	}
+
+	cmd = exec.Command("git", "add", "-A")
+	cmd.Dir = cloneDir
+	cmd.CombinedOutput()
+
+	cmd = exec.Command("git", "commit", "-m", "Remote change")
+	cmd.Dir = cloneDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ctx, fmt.Errorf("failed to commit remote change: %w\nOutput: %s", err, output)
+	}
+
+	cmd = exec.Command("git", "push")
+	cmd.Dir = cloneDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ctx, fmt.Errorf("failed to push remote change: %w\nOutput: %s", err, output)
+	}
+
+	return ctx, nil
+}
+
+// theLocalRepositoryShouldMatchTheRemote verifies local matches remote after sync.
+func theLocalRepositoryShouldMatchTheRemote(ctx context.Context) error {
+	return theLocalRepositoryShouldBeInSyncWithRemote(ctx)
+}
+
+// theRemoteHasBeenUpdatedByAnotherAgent simulates another agent pushing to the remote.
+func theRemoteHasBeenUpdatedByAnotherAgent(ctx context.Context) (context.Context, error) {
+	return theRemoteHasDifferentContentThanLocal(ctx)
+}
+
+// noNewGitCommitsShouldExist verifies no new commits have been made.
+func noNewGitCommitsShouldExist(ctx context.Context) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	initialCount, ok := ctx.Value(initialCommitCountKey).(int)
+	if !ok {
+		return fmt.Errorf("initial commit count not found in context")
+	}
+
+	currentCount, err := getGitCommitCount(env.TempDir)
+	if err != nil {
+		return fmt.Errorf("failed to get current commit count: %w", err)
+	}
+
+	if currentCount != initialCount {
+		return fmt.Errorf("expected no new commits (initial: %d), but found %d commits", initialCount, currentCount)
+	}
+
+	return nil
+}
+
+// thereAreUncommittedChangesInTheRepository creates uncommitted changes.
+func thereAreUncommittedChangesInTheRepository(ctx context.Context) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	// Create an uncommitted file
+	if err := env.CreateFile("uncommitted.txt", "Uncommitted changes"); err != nil {
+		return ctx, fmt.Errorf("failed to create uncommitted file: %w", err)
+	}
+
+	// Stage but don't commit
+	cmd := exec.Command("git", "add", "uncommitted.txt")
+	cmd.Dir = env.TempDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ctx, fmt.Errorf("failed to stage file: %w\nOutput: %s", err, output)
+	}
+
+	return ctx, nil
+}
+
+// getGitCommitCount returns the number of commits in the repository.
+func getGitCommitCount(dir string) (int, error) {
+	cmd := exec.Command("git", "rev-list", "--count", "HEAD")
+	cmd.Dir = dir
+	output, err := cmd.Output()
+	if err != nil {
+		return 0, fmt.Errorf("failed to count commits: %w", err)
+	}
+
+	count := 0
+	_, err = fmt.Sscanf(strings.TrimSpace(string(output)), "%d", &count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse commit count: %w", err)
+	}
+
+	return count, nil
 }

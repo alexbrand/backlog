@@ -230,11 +230,11 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 ## Phase 3: Local Backend — Git Sync Specs
 
 ### Feature: Git Sync (`git_sync.feature`)
-- [ ] Scenario: Mutation auto-commits when git_sync enabled
-- [ ] Scenario: Commit message format is correct
-- [ ] Scenario: Sync pulls and pushes
-- [ ] Scenario: Sync --force overwrites local changes
-- [ ] Scenario: Failed push returns exit code 2
+- [x] Scenario: Mutation auto-commits when git_sync enabled
+- [x] Scenario: Commit message format is correct
+- [x] Scenario: Sync pulls and pushes
+- [x] Scenario: Sync --force overwrites local changes
+- [x] Scenario: Failed push returns exit code 2
 
 ### Feature: Git-Based Claims (`git_claim.feature`)
 - [ ] Scenario: Claim with lock_mode git commits and pushes
@@ -242,11 +242,11 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [ ] Scenario: Release with git commits and pushes
 
 ### Step Definitions - Phase 3
-- [ ] Implement "Given git_sync is enabled"
-- [ ] Implement "Given lock_mode is {string}"
-- [ ] Implement "Given a remote git repository"
-- [ ] Implement "Then a git commit should exist with message containing {string}"
-- [ ] Implement "Then the remote should have the commit"
+- [x] Implement "Given git_sync is enabled"
+- [x] Implement "Given lock_mode is {string}"
+- [x] Implement "Given a remote git repository"
+- [x] Implement "Then a git commit should exist with message containing {string}"
+- [x] Implement "Then the remote should have the commit"
 
 ---
 
@@ -384,7 +384,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 | Phase 1c: Configuration | Complete | 2 | 16 |
 | Phase 1d: Error Handling | Complete | 1 | 12 |
 | Phase 2: Agent Coordination | Complete | 5 | 46 |
-| Phase 3: Git Sync | Not Started | 0 | 0 |
+| Phase 3: Git Sync | In Progress | 1 | 12 |
 | Phase 4: GitHub Issues | Not Started | 0 | 0 |
 | Phase 5: GitHub Projects | Not Started | 0 | 0 |
 | Phase 6: Linear | Not Started | 0 | 0 |
