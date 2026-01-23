@@ -54,3 +54,19 @@ Feature: Showing Tasks
     When I run "backlog show nonexistent-task"
     Then the exit code should be 3
     And stderr should contain "not found"
+
+  Scenario: Show task displays correct status directory
+    Given a backlog with the following tasks:
+      | id    | title          | status   | priority | assignee | labels | description       |
+      | task1 | Task in todo   | todo     | medium   |          |        | A todo task       |
+      | task2 | Task in review | review   | high     |          |        | A review task     |
+      | task3 | Task done      | done     | low      |          |        | A completed task  |
+    When I run "backlog show task1"
+    Then the exit code should be 0
+    And stdout should contain "todo"
+    When I run "backlog show task2"
+    Then the exit code should be 0
+    And stdout should contain "review"
+    When I run "backlog show task3"
+    Then the exit code should be 0
+    And stdout should contain "done"
