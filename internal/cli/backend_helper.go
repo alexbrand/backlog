@@ -7,6 +7,7 @@ import (
 	"github.com/alexbrand/backlog/internal/backend"
 	"github.com/alexbrand/backlog/internal/config"
 	"github.com/alexbrand/backlog/internal/github"
+	"github.com/alexbrand/backlog/internal/linear"
 	"github.com/alexbrand/backlog/internal/local"
 )
 
@@ -56,6 +57,15 @@ func getBackendAndConfig() (backend.Backend, backend.Config, *config.Workspace, 
 			if cfg != nil && cfg.Defaults.AgentID != "" && backendCfg.AgentID == "" {
 				backendCfg.AgentID = cfg.Defaults.AgentID
 			}
+		case "linear":
+			backendCfg.Workspace = &linear.WorkspaceConfig{
+				TeamKey:   ws.Team,
+				StatusMap: convertLinearStatusMap(ws.StatusMap),
+			}
+			// AgentID is already set above via ResolveAgentID
+			if cfg != nil && cfg.Defaults.AgentID != "" && backendCfg.AgentID == "" {
+				backendCfg.AgentID = cfg.Defaults.AgentID
+			}
 		default:
 			return nil, backend.Config{}, nil, fmt.Errorf("unsupported backend: %s", ws.Backend)
 		}
@@ -91,6 +101,21 @@ func convertStatusMap(statusMap map[string]config.Status) map[backend.Status]git
 			State:  mapping.State,
 			Labels: mapping.Labels,
 		}
+	}
+	return result
+}
+
+// convertLinearStatusMap converts the config.Status map to Linear's status mapping.
+// For Linear, we use the State field to specify the workflow state name.
+func convertLinearStatusMap(statusMap map[string]config.Status) map[backend.Status]string {
+	if statusMap == nil {
+		return nil
+	}
+
+	result := make(map[backend.Status]string)
+	for status, mapping := range statusMap {
+		// For Linear, the State field contains the workflow state name
+		result[backend.Status(status)] = mapping.State
 	}
 	return result
 }

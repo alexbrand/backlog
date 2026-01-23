@@ -171,26 +171,26 @@
 ## Phase 6: Linear Backend
 
 ### Linear Backend Implementation
-- [ ] Create `internal/linear/` package
-- [ ] Implement Linear API client
-- [ ] Implement `Connect()` with API key authentication
-- [ ] Implement `HealthCheck()`
-- [ ] Implement `List()` — fetch issues
-- [ ] Implement `Get()` — fetch single issue
-- [ ] Implement `Create()` — create issue
-- [ ] Implement `Update()` — update issue
-- [ ] Implement `Move()` — change state
+- [x] Create `internal/linear/` package
+- [x] Implement Linear API client
+- [x] Implement `Connect()` with API key authentication
+- [x] Implement `HealthCheck()`
+- [x] Implement `List()` — fetch issues
+- [x] Implement `Get()` — fetch single issue
+- [x] Implement `Create()` — create issue
+- [x] Implement `Update()` — update issue
+- [x] Implement `Move()` — change state
 
 ### Status Mapping
-- [ ] Map Linear states to canonical statuses
-- [ ] Implement configurable mapping
+- [x] Map Linear states to canonical statuses
+- [x] Implement configurable mapping
 
 ### Team & Project Support
-- [ ] Add `team` config option
-- [ ] Implement team filtering
+- [x] Add `team` config option
+- [x] Implement team filtering
 
 ### Agent Labels
-- [ ] Implement agent labels via Linear labels
+- [x] Implement agent labels via Linear labels
 
 ---
 
@@ -224,4 +224,4 @@
 | Phase 3: Git Sync | Complete | All done |
 | Phase 4: GitHub Issues | Complete | All done |
 | Phase 5: GitHub Projects | Complete | All done |
-| Phase 6: Linear | Not Started | 0/X |
+| Phase 6: Linear | Complete | All done |
