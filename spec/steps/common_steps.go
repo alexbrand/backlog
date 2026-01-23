@@ -248,7 +248,14 @@ func aBacklogWithTheFollowingTasks(ctx context.Context, table *godog.Table) (con
 		return ctx, fmt.Errorf("test environment not initialized")
 	}
 
-	// Create backlog directory first
+	// Clear existing backlog directory if it exists (to support overriding in scenarios)
+	if env.FileExists(".backlog") {
+		if err := os.RemoveAll(env.Path(".backlog")); err != nil {
+			return ctx, fmt.Errorf("failed to clear existing backlog directory: %w", err)
+		}
+	}
+
+	// Create backlog directory
 	if err := env.CreateBacklogDir(); err != nil {
 		return ctx, fmt.Errorf("failed to create backlog directory: %w", err)
 	}
@@ -447,7 +454,14 @@ func theJSONOutputShouldHaveEqualTo(ctx context.Context, path, expected string) 
 		return fmt.Errorf("stdout is not valid JSON: %s\nstdout:\n%s", jsonResult.Error(), result.Stdout)
 	}
 
-	actual := jsonResult.GetString(path)
+	// Use Get to handle any type (string, number, bool, null)
+	val := jsonResult.Get(path)
+	var actual string
+	if val == nil {
+		actual = "null"
+	} else {
+		actual = fmt.Sprintf("%v", val)
+	}
 	if actual != expected {
 		return fmt.Errorf("expected JSON path %q to be %q, got %q", path, expected, actual)
 	}

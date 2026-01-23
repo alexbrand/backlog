@@ -11,15 +11,45 @@ import (
 type PlainFormatter struct{}
 
 // FormatTask outputs a single task in plain format.
+// Includes all task fields for detailed view (used by show command).
 func (f *PlainFormatter) FormatTask(w io.Writer, task *backend.Task) error {
+	fmt.Fprintf(w, "%s\t%s\t%s\t%s", task.ID, task.Status, task.Priority, task.Title)
+	if task.Assignee != "" {
+		fmt.Fprintf(w, "\t%s", task.Assignee)
+	}
+	if len(task.Labels) > 0 {
+		fmt.Fprintf(w, "\t%s", joinLabels(task.Labels))
+	}
+	fmt.Fprintln(w)
+	if task.Description != "" {
+		fmt.Fprintln(w, task.Description)
+	}
+	return nil
+}
+
+// joinLabels joins labels with commas for plain output.
+func joinLabels(labels []string) string {
+	result := ""
+	for i, l := range labels {
+		if i > 0 {
+			result += ","
+		}
+		result += l
+	}
+	return result
+}
+
+// formatTaskSummary outputs a single task in summary format (one line).
+func (f *PlainFormatter) formatTaskSummary(w io.Writer, task *backend.Task) error {
 	fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", task.ID, task.Status, task.Priority, task.Title)
 	return nil
 }
 
 // FormatTaskList outputs a list of tasks in plain format.
+// Uses summary format (one line per task) without descriptions.
 func (f *PlainFormatter) FormatTaskList(w io.Writer, list *backend.TaskList) error {
 	for _, task := range list.Tasks {
-		if err := f.FormatTask(w, &task); err != nil {
+		if err := f.formatTaskSummary(w, &task); err != nil {
 			return err
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/alexbrand/backlog/internal/backend"
+	"github.com/alexbrand/backlog/internal/local"
 	"github.com/alexbrand/backlog/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -68,6 +69,10 @@ func runRelease(id, comment string) error {
 	if err := claimer.Release(id); err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return NotFoundError(err.Error())
+		}
+		// Check for release conflict error (not claimed or claimed by different agent)
+		if _, isReleaseConflict := err.(*local.ReleaseConflictError); isReleaseConflict {
+			return ConflictError(err.Error())
 		}
 		return err
 	}

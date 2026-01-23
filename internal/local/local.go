@@ -953,13 +953,45 @@ func (l *Local) releaseWithFileLock(id string) error {
 		return err
 	}
 
+	// Check if task is claimed (either by lock file or agent label)
+	lock, _ := l.readLock(id)
+	agentLabels := l.findAgentLabels(task.Labels)
+
+	// Task is not claimed if there's no active lock and no agent label
+	if (lock == nil || !lock.isActive()) && len(agentLabels) == 0 {
+		return &ReleaseConflictError{
+			TaskID:       id,
+			CurrentAgent: l.agentID,
+			NotClaimed:   true,
+		}
+	}
+
+	// Check if task is claimed by a different agent
+	var claimedBy string
+	if lock != nil && lock.isActive() {
+		claimedBy = lock.Agent
+	} else if len(agentLabels) > 0 {
+		// Extract agent ID from label (format: "agent:id")
+		parts := strings.SplitN(agentLabels[0], ":", 2)
+		if len(parts) == 2 {
+			claimedBy = parts[1]
+		}
+	}
+
+	if claimedBy != "" && claimedBy != l.agentID {
+		return &ReleaseConflictError{
+			TaskID:       id,
+			CurrentAgent: l.agentID,
+			ClaimedBy:    claimedBy,
+		}
+	}
+
 	// Remove the lock file
 	if err := l.removeLock(id); err != nil {
 		return fmt.Errorf("failed to remove lock: %w", err)
 	}
 
 	// Remove agent labels
-	agentLabels := l.findAgentLabels(task.Labels)
 	if len(agentLabels) > 0 {
 		_, err = l.updateInternal(id, backend.TaskChanges{
 			RemoveLabels: agentLabels,
@@ -1010,6 +1042,22 @@ type ClaimConflictError struct {
 
 func (e *ClaimConflictError) Error() string {
 	return fmt.Sprintf("task %s is already claimed by agent %s", e.TaskID, e.ClaimedBy)
+}
+
+// ReleaseConflictError represents an error when trying to release a task that
+// is either not claimed or claimed by a different agent.
+type ReleaseConflictError struct {
+	TaskID       string
+	CurrentAgent string
+	ClaimedBy    string
+	NotClaimed   bool
+}
+
+func (e *ReleaseConflictError) Error() string {
+	if e.NotClaimed {
+		return fmt.Sprintf("task %s is not claimed", e.TaskID)
+	}
+	return fmt.Sprintf("task %s is claimed by different agent %s", e.TaskID, e.ClaimedBy)
 }
 
 // gitCommit creates a git commit with the given message if git sync is enabled.

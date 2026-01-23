@@ -78,7 +78,9 @@ func getBackendAndConfig() (backend.Backend, backend.Config, *config.Workspace, 
 				return nil, backend.Config{}, nil, err
 			}
 			backendCfg = backend.Config{
-				Workspace: &local.WorkspaceConfig{Path: ".backlog"},
+				AgentID:          ResolveAgentID(nil),
+				AgentLabelPrefix: "agent",
+				Workspace:        &local.WorkspaceConfig{Path: ".backlog"},
 			}
 		} else {
 			// No config and no local .backlog directory
