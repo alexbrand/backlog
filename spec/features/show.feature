@@ -48,3 +48,9 @@ Feature: Showing Tasks
     And stdout should contain "Found relevant documentation"
     And stdout should contain "@alex"
     And stdout should contain "@bot"
+
+  Scenario: Show non-existent task returns exit code 3
+    Given a fresh backlog directory
+    When I run "backlog show nonexistent-task"
+    Then the exit code should be 3
+    And stderr should contain "not found"

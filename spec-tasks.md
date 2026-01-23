@@ -81,7 +81,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: Show task displays all fields
 - [x] Scenario: Show task in JSON format
 - [x] Scenario: Show task with comments
-- [ ] Scenario: Show non-existent task returns exit code 3
+- [x] Scenario: Show non-existent task returns exit code 3
 - [ ] Scenario: Show task displays correct status directory
 
 ### Feature: Moving Tasks (`move.feature`)
