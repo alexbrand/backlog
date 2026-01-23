@@ -14,7 +14,7 @@
 - [x] Define `TaskFilters`, `TaskInput`, `TaskChanges` types
 - [x] Define status enum (`backlog`, `todo`, `in-progress`, `review`, `done`)
 - [x] Define priority enum (`urgent`, `high`, `medium`, `low`, `none`)
-- [ ] Create backend registry in `internal/backend/registry.go`
+- [x] Create backend registry in `internal/backend/registry.go`
 
 ### Output Formatters
 - [ ] Create formatter interface in `internal/output/`
