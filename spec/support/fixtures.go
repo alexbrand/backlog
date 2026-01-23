@@ -10,16 +10,24 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// CommentFixture represents a comment for fixture loading.
+type CommentFixture struct {
+	Author string `yaml:"author"`
+	Date   string `yaml:"date"`
+	Body   string `yaml:"body"`
+}
+
 // TaskFixture represents a task for fixture loading.
 type TaskFixture struct {
-	ID          string   `yaml:"id"`
-	Title       string   `yaml:"title"`
-	Description string   `yaml:"description,omitempty"`
-	Status      string   `yaml:"status"`
-	Priority    string   `yaml:"priority,omitempty"`
-	Assignee    string   `yaml:"assignee,omitempty"`
-	Labels      []string `yaml:"labels,omitempty"`
-	AgentID     string   `yaml:"agent_id,omitempty"`
+	ID          string           `yaml:"id"`
+	Title       string           `yaml:"title"`
+	Description string           `yaml:"description,omitempty"`
+	Status      string           `yaml:"status"`
+	Priority    string           `yaml:"priority,omitempty"`
+	Assignee    string           `yaml:"assignee,omitempty"`
+	Labels      []string         `yaml:"labels,omitempty"`
+	AgentID     string           `yaml:"agent_id,omitempty"`
+	Comments    []CommentFixture `yaml:"comments,omitempty"`
 }
 
 // BacklogFixture represents a complete backlog directory fixture.
@@ -202,6 +210,16 @@ func (l *FixtureLoader) createTaskFile(env *TestEnv, task *TaskFixture) error {
 		content.WriteString("## Description\n\n")
 		content.WriteString(task.Description)
 		content.WriteString("\n")
+	}
+
+	// Add comments section if there are comments
+	if len(task.Comments) > 0 {
+		content.WriteString("\n## Comments\n")
+		for _, comment := range task.Comments {
+			content.WriteString(fmt.Sprintf("\n### %s @%s\n", comment.Date, comment.Author))
+			content.WriteString(comment.Body)
+			content.WriteString("\n")
+		}
 	}
 
 	// Write file

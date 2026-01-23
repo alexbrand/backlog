@@ -107,6 +107,7 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the JSON output should have "([^"]*)" as an array$`, theJSONOutputShouldHaveAsAnArray)
 	ctx.Step(`^the JSON output should have array "([^"]*)" containing "([^"]*)"$`, theJSONOutputShouldHaveArrayContaining)
 	ctx.Step(`^the JSON output should have array length "([^"]*)" equal to (\d+)$`, theJSONOutputShouldHaveArrayLengthEqualTo)
+	ctx.Step(`^task "([^"]*)" has the following comments:$`, taskHasTheFollowingComments)
 }
 
 // aFreshBacklogDirectory creates a new empty .backlog directory.
@@ -583,4 +584,70 @@ func theJSONOutputShouldHaveArrayLengthEqualTo(ctx context.Context, path string,
 	}
 
 	return nil
+}
+
+// taskHasTheFollowingComments adds comments to an existing task.
+func taskHasTheFollowingComments(ctx context.Context, taskID string, table *godog.Table) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	// Parse table header to get column indices
+	if len(table.Rows) < 2 {
+		return ctx, fmt.Errorf("table must have at least a header row and one data row")
+	}
+
+	header := table.Rows[0]
+	colIndex := make(map[string]int)
+	for i, cell := range header.Cells {
+		colIndex[cell.Value] = i
+	}
+
+	// Parse comments from table
+	var comments []support.CommentFixture
+	for _, row := range table.Rows[1:] {
+		getValue := func(col string) string {
+			if idx, ok := colIndex[col]; ok && idx < len(row.Cells) {
+				return row.Cells[idx].Value
+			}
+			return ""
+		}
+
+		comment := support.CommentFixture{
+			Author: getValue("author"),
+			Date:   getValue("date"),
+			Body:   getValue("body"),
+		}
+		comments = append(comments, comment)
+	}
+
+	// Read the existing task file
+	reader := support.NewTaskFileReader(env.Path(".backlog"))
+	task := reader.ReadTask(taskID)
+	if task.ParseErr != nil {
+		return ctx, fmt.Errorf("failed to read task %s: %w", taskID, task.ParseErr)
+	}
+
+	// Build comments section
+	var commentsSection strings.Builder
+	commentsSection.WriteString("\n## Comments\n")
+	for _, comment := range comments {
+		commentsSection.WriteString(fmt.Sprintf("\n### %s @%s\n", comment.Date, comment.Author))
+		commentsSection.WriteString(comment.Body)
+		commentsSection.WriteString("\n")
+	}
+
+	// Read the original file content and append comments
+	content, err := os.ReadFile(task.Path)
+	if err != nil {
+		return ctx, fmt.Errorf("failed to read task file: %w", err)
+	}
+
+	newContent := string(content) + commentsSection.String()
+	if err := os.WriteFile(task.Path, []byte(newContent), 0644); err != nil {
+		return ctx, fmt.Errorf("failed to write task file: %w", err)
+	}
+
+	return ctx, nil
 }

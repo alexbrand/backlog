@@ -33,3 +33,18 @@ Feature: Showing Tasks
     And the JSON output should have "labels" as an array
     And the JSON output should have array "labels" containing "feature"
     And the JSON output should have array "labels" containing "auth"
+
+  Scenario: Show task with comments
+    Given a backlog with the following tasks:
+      | id    | title           | status      | priority | assignee | labels        | description                  |
+      | task1 | Implement auth  | in-progress | high     | alex     | feature,auth  | OAuth2 implementation needed |
+    And task "task1" has the following comments:
+      | author | date       | body                                |
+      | alex   | 2025-01-16 | Started research on OAuth providers |
+      | bot    | 2025-01-17 | Found relevant documentation        |
+    When I run "backlog show task1 --comments"
+    Then the exit code should be 0
+    And stdout should contain "Started research on OAuth providers"
+    And stdout should contain "Found relevant documentation"
+    And stdout should contain "@alex"
+    And stdout should contain "@bot"
