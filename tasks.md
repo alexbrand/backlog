@@ -3,8 +3,8 @@
 ## Phase 1: Local Backend — Basic CRUD
 
 ### Project Setup
-- [ ] Initialize Go module (`go mod init`)
-- [ ] Create directory structure (`cmd/backlog/`, `internal/`)
+- [x] Initialize Go module (`go mod init`)
+- [x] Create directory structure (`cmd/backlog/`, `internal/`)
 - [ ] Set up Cobra CLI framework
 - [ ] Set up Viper for configuration
 
@@ -216,7 +216,7 @@
 
 | Phase | Status | Tasks |
 |-------|--------|-------|
-| Phase 1: Local CRUD | Not Started | 0/X |
+| Phase 1: Local CRUD | In Progress | 2/X |
 | Phase 2: Agent Coordination | Not Started | 0/X |
 | Phase 3: Git Sync | Not Started | 0/X |
 | Phase 4: GitHub Issues | Not Started | 0/X |
