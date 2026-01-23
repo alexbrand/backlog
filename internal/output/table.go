@@ -135,6 +135,16 @@ func (f *TableFormatter) FormatUpdated(w io.Writer, task *backend.Task) error {
 	return nil
 }
 
+// FormatClaimed outputs the result of claiming a task.
+func (f *TableFormatter) FormatClaimed(w io.Writer, task *backend.Task, agentID string, alreadyOwned bool) error {
+	if alreadyOwned {
+		fmt.Fprintf(w, "Already claimed %s: %s (agent: %s)\n", task.ID, task.Title, agentID)
+	} else {
+		fmt.Fprintf(w, "Claimed %s: %s (agent: %s)\n", task.ID, task.Title, agentID)
+	}
+	return nil
+}
+
 // FormatError outputs an error message.
 func (f *TableFormatter) FormatError(w io.Writer, code string, message string, details map[string]any) error {
 	fmt.Fprintf(w, "error: %s\n", message)

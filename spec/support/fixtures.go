@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -126,14 +127,20 @@ func (l *FixtureLoader) applyFixture(env *TestEnv, fixture *BacklogFixture) erro
 		}
 	}
 
-	// Create task files
+	// Create task files and lock files for tasks with agent_id
 	for _, task := range fixture.Tasks {
 		if err := l.createTaskFile(env, &task); err != nil {
 			return fmt.Errorf("failed to create task %s: %w", task.ID, err)
 		}
+		// If task has an agent_id, create a lock file for it
+		if task.AgentID != "" {
+			if err := l.createLockFile(env, task.ID, task.AgentID); err != nil {
+				return fmt.Errorf("failed to create lock for %s: %w", task.ID, err)
+			}
+		}
 	}
 
-	// Create lock files
+	// Create additional explicit lock files
 	for taskID, agentID := range fixture.Locks {
 		if err := l.createLockFile(env, taskID, agentID); err != nil {
 			return fmt.Errorf("failed to create lock for %s: %w", taskID, err)
@@ -229,7 +236,13 @@ func (l *FixtureLoader) createTaskFile(env *TestEnv, task *TaskFixture) error {
 
 // createLockFile creates a lock file for a task.
 func (l *FixtureLoader) createLockFile(env *TestEnv, taskID, agentID string) error {
-	content := fmt.Sprintf("agent: %s\nclaimed_at: 2025-01-01T00:00:00Z\nexpires_at: 2025-01-01T00:30:00Z\n", agentID)
+	// Use current time + 30 minutes for expiration to ensure lock is active
+	now := time.Now().UTC()
+	expiresAt := now.Add(30 * time.Minute)
+	content := fmt.Sprintf("agent: %s\nclaimed_at: %s\nexpires_at: %s\n",
+		agentID,
+		now.Format(time.RFC3339),
+		expiresAt.Format(time.RFC3339))
 	path := filepath.Join(".backlog", ".locks", taskID+".lock")
 	return env.CreateFile(path, content)
 }

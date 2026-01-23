@@ -684,11 +684,12 @@ func (l *Local) Claim(id string, agentID string) (*backend.ClaimResult, error) {
 		return nil, fmt.Errorf("failed to write lock: %w", err)
 	}
 
-	// Remove any existing agent labels and add the new one
+	// Remove any existing agent labels, add the new one, and set assignee to agent ID
 	agentLabel := fmt.Sprintf("%s:%s", l.agentLabelPrefix, agentID)
 	changes := backend.TaskChanges{
 		RemoveLabels: l.findAgentLabels(task.Labels),
 		AddLabels:    []string{agentLabel},
+		Assignee:     &agentID,
 	}
 
 	// Move to in-progress and apply label changes

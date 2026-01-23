@@ -60,6 +60,18 @@ func (f *JSONFormatter) FormatUpdated(w io.Writer, task *backend.Task) error {
 	})
 }
 
+// FormatClaimed outputs the result of claiming a task as JSON.
+func (f *JSONFormatter) FormatClaimed(w io.Writer, task *backend.Task, agentID string, alreadyOwned bool) error {
+	return f.writeJSON(w, map[string]any{
+		"id":           task.ID,
+		"title":        task.Title,
+		"status":       task.Status,
+		"agent":        agentID,
+		"alreadyOwned": alreadyOwned,
+		"url":          task.URL,
+	})
+}
+
 // FormatError outputs an error as JSON.
 func (f *JSONFormatter) FormatError(w io.Writer, code string, message string, details map[string]any) error {
 	errObj := map[string]any{

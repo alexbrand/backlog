@@ -60,6 +60,12 @@ func (f *PlainFormatter) FormatUpdated(w io.Writer, task *backend.Task) error {
 	return nil
 }
 
+// FormatClaimed outputs the result of claiming a task in plain format.
+func (f *PlainFormatter) FormatClaimed(w io.Writer, task *backend.Task, agentID string, alreadyOwned bool) error {
+	fmt.Fprintf(w, "%s\t%s\t%s\n", task.ID, task.Status, agentID)
+	return nil
+}
+
 // FormatError outputs an error in plain format.
 func (f *PlainFormatter) FormatError(w io.Writer, code string, message string, details map[string]any) error {
 	fmt.Fprintf(w, "error: %s\n", message)
