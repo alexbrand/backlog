@@ -185,14 +185,14 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: Claim non-existent task returns exit code 3
 
 ### Feature: Releasing Tasks (`release.feature`)
-- [ ] Scenario: Release claimed task succeeds
-- [ ] Scenario: Release removes agent label
-- [ ] Scenario: Release moves task to todo
-- [ ] Scenario: Release unassigns user
-- [ ] Scenario: Release removes lock file
-- [ ] Scenario: Release with comment flag
-- [ ] Scenario: Release task not claimed by this agent fails
-- [ ] Scenario: Release unclaimed task fails
+- [x] Scenario: Release claimed task succeeds
+- [x] Scenario: Release removes agent label
+- [x] Scenario: Release moves task to todo
+- [x] Scenario: Release unassigns user
+- [x] Scenario: Release removes lock file
+- [x] Scenario: Release with comment flag
+- [x] Scenario: Release task not claimed by this agent fails
+- [x] Scenario: Release unclaimed task fails
 
 ### Feature: Next Task (`next.feature`)
 - [ ] Scenario: Next returns highest priority unclaimed task
@@ -383,7 +383,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 | Phase 1b: Output Formats | Complete | 3 | 8 |
 | Phase 1c: Configuration | Complete | 2 | 16 |
 | Phase 1d: Error Handling | Complete | 1 | 12 |
-| Phase 2: Agent Coordination | In Progress | 1 | 14 |
+| Phase 2: Agent Coordination | In Progress | 2 | 22 |
 | Phase 3: Git Sync | Not Started | 0 | 0 |
 | Phase 4: GitHub Issues | Not Started | 0 | 0 |
 | Phase 5: GitHub Projects | Not Started | 0 | 0 |
