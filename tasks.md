@@ -158,13 +158,13 @@
 ### GitHub Projects v2 Integration
 - [x] Implement GraphQL API client for Projects
 - [x] Implement project field discovery
-- [ ] Implement column-based status (instead of labels)
-- [ ] Add `project` config option (project number)
-- [ ] Add `status_field` config option
+- [x] Implement column-based status (instead of labels)
+- [x] Add `project` config option (project number)
+- [x] Add `status_field` config option
 
 ### Status via Columns
-- [ ] Implement `Move()` via project column change
-- [ ] Implement status reading from project item
+- [x] Implement `Move()` via project column change
+- [x] Implement status reading from project item
 
 ---
 
@@ -223,5 +223,5 @@
 | Phase 2: Agent Coordination | Complete | All done |
 | Phase 3: Git Sync | Complete | All done |
 | Phase 4: GitHub Issues | Complete | All done |
-| Phase 5: GitHub Projects | Not Started | 0/X |
+| Phase 5: GitHub Projects | Complete | All done |
 | Phase 6: Linear | Not Started | 0/X |

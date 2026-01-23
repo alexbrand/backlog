@@ -64,6 +64,10 @@ type GitHub struct {
 	statusMap        map[backend.Status]StatusMapping
 	connected        bool
 	ctx              context.Context
+	// Projects v2 support
+	projectsClient *ProjectsClient
+	statusField    *ProjectField
+	useProjects    bool
 }
 
 // New creates a new GitHub backend instance.
@@ -134,6 +138,27 @@ func (g *GitHub) Connect(cfg backend.Config) error {
 	)
 	tc := oauth2.NewClient(g.ctx, ts)
 	g.client = gh.NewClient(tc)
+
+	// Initialize Projects v2 client if project is configured
+	if wsCfg.Project > 0 {
+		statusFieldName := wsCfg.StatusField
+		if statusFieldName == "" {
+			statusFieldName = "Status"
+		}
+		pc, err := NewProjectsClient(g.ctx, token, g.owner, g.repo, wsCfg.Project, statusFieldName)
+		if err != nil {
+			return fmt.Errorf("failed to create projects client: %w", err)
+		}
+		g.projectsClient = pc
+
+		// Get and cache the status field configuration
+		sf, err := pc.GetStatusField()
+		if err != nil {
+			return fmt.Errorf("failed to get project status field: %w", err)
+		}
+		g.statusField = sf
+		g.useProjects = true
+	}
 
 	g.connected = true
 	return nil
@@ -316,13 +341,15 @@ func (g *GitHub) Create(input backend.TaskInput) (*backend.Task, error) {
 	var labels []string
 	labels = append(labels, input.Labels...)
 
-	// Add status labels
+	// Add status labels only if not using project-based status
 	status := input.Status
 	if status == "" {
 		status = backend.StatusBacklog
 	}
-	if mapping, ok := g.statusMap[status]; ok {
-		labels = append(labels, mapping.Labels...)
+	if !g.useProjects {
+		if mapping, ok := g.statusMap[status]; ok {
+			labels = append(labels, mapping.Labels...)
+		}
 	}
 
 	// Add priority label if set
@@ -342,6 +369,27 @@ func (g *GitHub) Create(input backend.TaskInput) (*backend.Task, error) {
 	issue, _, err := g.client.Issues.Create(g.ctx, g.owner, g.repo, issueReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create issue: %w", err)
+	}
+
+	// Add issue to project and set status if using Projects v2
+	if g.useProjects {
+		issueNodeID, err := g.projectsClient.GetIssueNodeID(issue.GetNumber())
+		if err != nil {
+			// Log warning but don't fail - issue was created
+			return g.issueToTask(issue), nil
+		}
+
+		itemID, err := g.projectsClient.AddIssueToProject(issueNodeID)
+		if err != nil {
+			// Log warning but don't fail - issue was created
+			return g.issueToTask(issue), nil
+		}
+
+		// Set the status on the project item
+		optionID, err := g.projectsClient.MapStatusToOptionID(status, g.statusField)
+		if err == nil {
+			g.projectsClient.UpdateProjectItemStatus(itemID, optionID)
+		}
 	}
 
 	return g.issueToTask(issue), nil
@@ -476,7 +524,15 @@ func (g *GitHub) Move(id string, status backend.Status) (*backend.Task, error) {
 		return nil, fmt.Errorf("failed to get issue: %w", err)
 	}
 
+	// Update project status if using Projects v2
+	if g.useProjects {
+		if err := g.updateProjectStatus(issueNum, status); err != nil {
+			return nil, fmt.Errorf("failed to update project status: %w", err)
+		}
+	}
+
 	// Build new labels: remove status labels, add new status labels
+	// Only update labels if not using project-based status
 	newLabels := make([]string, 0)
 	for _, label := range issue.Labels {
 		labelName := label.GetName()
@@ -497,9 +553,11 @@ func (g *GitHub) Move(id string, status backend.Status) (*backend.Task, error) {
 		}
 	}
 
-	// Add new status labels
-	if mapping, ok := g.statusMap[status]; ok {
-		newLabels = append(newLabels, mapping.Labels...)
+	// Add new status labels only if not using project-based status
+	if !g.useProjects {
+		if mapping, ok := g.statusMap[status]; ok {
+			newLabels = append(newLabels, mapping.Labels...)
+		}
 	}
 
 	// Determine state
@@ -518,6 +576,37 @@ func (g *GitHub) Move(id string, status backend.Status) (*backend.Task, error) {
 	}
 
 	return g.issueToTask(updatedIssue), nil
+}
+
+// updateProjectStatus updates the status of an issue in GitHub Projects v2.
+func (g *GitHub) updateProjectStatus(issueNum int, status backend.Status) error {
+	// Get the project item for this issue
+	item, err := g.projectsClient.GetProjectItemByIssue(issueNum)
+	if err != nil {
+		// Issue might not be in the project - try to add it
+		issueNodeID, err := g.projectsClient.GetIssueNodeID(issueNum)
+		if err != nil {
+			return fmt.Errorf("failed to get issue node ID: %w", err)
+		}
+		itemID, err := g.projectsClient.AddIssueToProject(issueNodeID)
+		if err != nil {
+			return fmt.Errorf("failed to add issue to project: %w", err)
+		}
+		item = &ProjectItem{ID: itemID, IssueNumber: issueNum}
+	}
+
+	// Map status to project option ID
+	optionID, err := g.projectsClient.MapStatusToOptionID(status, g.statusField)
+	if err != nil {
+		return err
+	}
+
+	// Update the project item status
+	if err := g.projectsClient.UpdateProjectItemStatus(item.ID, optionID); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Assign assigns a task to a user.
@@ -629,7 +718,14 @@ func (g *GitHub) Claim(id string, agentID string) (*backend.ClaimResult, error) 
 		}
 	}
 
-	// Build new labels: existing + agent label + in-progress status
+	// Update project status if using Projects v2
+	if g.useProjects {
+		if err := g.updateProjectStatus(issueNum, backend.StatusInProgress); err != nil {
+			return nil, fmt.Errorf("failed to update project status: %w", err)
+		}
+	}
+
+	// Build new labels: existing + agent label + in-progress status (if not using projects)
 	newLabels := make([]string, 0)
 	for _, label := range issue.Labels {
 		labelName := label.GetName()
@@ -651,10 +747,13 @@ func (g *GitHub) Claim(id string, agentID string) (*backend.ClaimResult, error) 
 		}
 	}
 
-	// Add agent label and in-progress status labels
+	// Add agent label
 	newLabels = append(newLabels, agentLabelPrefix+agentID)
-	if mapping, ok := g.statusMap[backend.StatusInProgress]; ok {
-		newLabels = append(newLabels, mapping.Labels...)
+	// Add in-progress status labels only if not using project-based status
+	if !g.useProjects {
+		if mapping, ok := g.statusMap[backend.StatusInProgress]; ok {
+			newLabels = append(newLabels, mapping.Labels...)
+		}
 	}
 
 	// Update the issue with assignment
@@ -684,13 +783,20 @@ func (g *GitHub) Release(id string) error {
 		return err
 	}
 
+	// Update project status if using Projects v2
+	if g.useProjects {
+		if err := g.updateProjectStatus(issueNum, backend.StatusTodo); err != nil {
+			return fmt.Errorf("failed to update project status: %w", err)
+		}
+	}
+
 	// Get current issue
 	issue, _, err := g.client.Issues.Get(g.ctx, g.owner, g.repo, issueNum)
 	if err != nil {
 		return fmt.Errorf("failed to get issue: %w", err)
 	}
 
-	// Build new labels: remove agent labels and status labels, add todo status
+	// Build new labels: remove agent labels and status labels, add todo status (if not using projects)
 	agentLabelPrefix := g.agentLabelPrefix + ":"
 	newLabels := make([]string, 0)
 	for _, label := range issue.Labels {
@@ -717,9 +823,11 @@ func (g *GitHub) Release(id string) error {
 		}
 	}
 
-	// Add todo status labels
-	if mapping, ok := g.statusMap[backend.StatusTodo]; ok {
-		newLabels = append(newLabels, mapping.Labels...)
+	// Add todo status labels only if not using project-based status
+	if !g.useProjects {
+		if mapping, ok := g.statusMap[backend.StatusTodo]; ok {
+			newLabels = append(newLabels, mapping.Labels...)
+		}
 	}
 
 	// Update the issue: remove assignees, update labels
@@ -817,6 +925,15 @@ func (g *GitHub) issueToTask(issue *gh.Issue) *backend.Task {
 func (g *GitHub) determineStatus(issue *gh.Issue) backend.Status {
 	if issue.GetState() == "closed" {
 		return backend.StatusDone
+	}
+
+	// If using Projects v2, get status from project field
+	if g.useProjects {
+		item, err := g.projectsClient.GetProjectItemByIssue(issue.GetNumber())
+		if err == nil && item.FieldValueStr != "" {
+			return g.projectsClient.MapOptionToStatus(item.FieldValueStr)
+		}
+		// Fall through to label-based status if not in project or no status set
 	}
 
 	// Check labels for status
