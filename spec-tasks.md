@@ -325,11 +325,24 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: Environment variable takes precedence over credentials.yaml
 
 ### Feature: Linear CRUD (`linear_crud.feature`)
-- [ ] Scenario: List fetches issues from team
-- [ ] Scenario: Add creates Linear issue
-- [ ] Scenario: Show fetches issue details
-- [ ] Scenario: Edit updates issue fields
-- [ ] Scenario: Move changes issue state
+- [x] Scenario: List fetches issues from team
+- [x] Scenario: List fetches issues with correct status mapping
+- [x] Scenario: List filters by priority
+- [x] Scenario: Add creates Linear issue
+- [x] Scenario: Add creates Linear issue with priority
+- [x] Scenario: Add creates Linear issue with description
+- [x] Scenario: Show fetches issue details
+- [x] Scenario: Show fetches issue details in table format
+- [x] Scenario: Show non-existent issue returns exit code 3
+- [x] Scenario: Show with JSON error format for non-existent issue
+- [x] Scenario: Edit updates issue title
+- [x] Scenario: Edit updates issue priority
+- [x] Scenario: Edit non-existent issue returns exit code 3
+- [x] Scenario: Move changes issue state to in-progress
+- [x] Scenario: Move changes issue state to review
+- [x] Scenario: Move changes issue state to done
+- [x] Scenario: Move to invalid status fails
+- [x] Scenario: Move non-existent issue returns exit code 3
 
 ### Feature: Linear Status Mapping (`linear_status.feature`)
 - [ ] Scenario: Linear states map to canonical statuses
@@ -396,5 +409,5 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 | Phase 3: Git Sync | Complete | 2 | 19 |
 | Phase 4: GitHub Issues | Complete | 6 | 73 |
 | Phase 5: GitHub Projects | Complete | 1 | 7 |
-| Phase 6: Linear | In Progress | 1 | 7 |
+| Phase 6: Linear | In Progress | 2 | 25 |
 | Cross-Cutting | Not Started | 0 | 0 |
