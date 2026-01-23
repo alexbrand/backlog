@@ -281,8 +281,8 @@ func TestIssueToTask(t *testing.T) {
 				},
 			},
 			validate: func(t *testing.T, task *backend.Task) {
-				if task.ID != "LIN-ENG-123" {
-					t.Errorf("ID = %s, want LIN-ENG-123", task.ID)
+				if task.ID != "ENG-123" {
+					t.Errorf("ID = %s, want ENG-123", task.ID)
 				}
 				if task.Title != "Test Issue" {
 					t.Errorf("Title = %s, want Test Issue", task.Title)

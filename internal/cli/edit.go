@@ -89,7 +89,9 @@ func runEdit(id string) error {
 	// Update the task
 	task, err := b.Update(id, changes)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		// Check if this is a "not found" error (case-insensitive check for 404/Not Found)
+		errLower := strings.ToLower(err.Error())
+		if strings.Contains(errLower, "not found") || strings.Contains(errLower, "404") {
 			return NotFoundError(err.Error())
 		}
 		return err

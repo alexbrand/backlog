@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/alexbrand/backlog/internal/backend"
+	"github.com/alexbrand/backlog/internal/config"
 )
 
 // Format represents an output format type.
@@ -66,6 +67,12 @@ type Formatter interface {
 
 	// FormatError outputs an error.
 	FormatError(w io.Writer, code string, message string, details map[string]any) error
+
+	// FormatConfig outputs configuration.
+	FormatConfig(w io.Writer, cfg *config.Config) error
+
+	// FormatHealthCheck outputs health check results.
+	FormatHealthCheck(w io.Writer, backendName string, ws *config.Workspace, status *backend.HealthStatus) error
 }
 
 // New creates a formatter for the specified format.

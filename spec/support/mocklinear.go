@@ -204,6 +204,10 @@ func (m *MockLinearServer) handleGraphQL(w http.ResponseWriter, r *http.Request)
 	switch {
 	case strings.Contains(query, "viewer"):
 		m.handleViewerQuery(w)
+	case strings.Contains(query, "issueLabelCreate"):
+		m.handleIssueLabelCreate(w, req.Variables)
+	case strings.Contains(query, "commentCreate"):
+		m.handleCommentCreate(w, req.Variables)
 	case strings.Contains(query, "issueCreate") || strings.Contains(query, "createIssue"):
 		m.handleCreateIssue(w, req.Variables)
 	case strings.Contains(query, "issueUpdate") || strings.Contains(query, "updateIssue"):
@@ -593,6 +597,63 @@ func (m *MockLinearServer) issueToGraphQL(issue *MockLinearIssue) map[string]int
 	}
 
 	return result
+}
+
+// handleIssueLabelCreate handles label creation mutations.
+func (m *MockLinearServer) handleIssueLabelCreate(w http.ResponseWriter, variables map[string]interface{}) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	input, ok := variables["input"].(map[string]interface{})
+	if !ok {
+		m.writeGraphQLError(w, "Invalid input", "BAD_REQUEST")
+		return
+	}
+
+	labelName := getString(input, "name")
+	labelID := "label-" + labelName
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]interface{}{
+			"issueLabelCreate": map[string]interface{}{
+				"success": true,
+				"issueLabel": map[string]interface{}{
+					"id":   labelID,
+					"name": labelName,
+				},
+			},
+		},
+	})
+}
+
+// handleCommentCreate handles comment creation mutations.
+func (m *MockLinearServer) handleCommentCreate(w http.ResponseWriter, variables map[string]interface{}) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	input, ok := variables["input"].(map[string]interface{})
+	if !ok {
+		m.writeGraphQLError(w, "Invalid input", "BAD_REQUEST")
+		return
+	}
+
+	body := getString(input, "body")
+	commentID := generateID()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]interface{}{
+			"commentCreate": map[string]interface{}{
+				"success": true,
+				"comment": map[string]interface{}{
+					"id":        commentID,
+					"body":      body,
+					"createdAt": time.Now().Format(time.RFC3339),
+				},
+			},
+		},
+	})
 }
 
 // writeGraphQLError writes a GraphQL-style error response.

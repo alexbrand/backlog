@@ -53,6 +53,11 @@ func init() {
 }
 
 func runList() error {
+	// Output debug information if verbose mode is enabled
+	if IsVerbose() {
+		fmt.Fprintln(os.Stderr, "debug: listing tasks with filters")
+	}
+
 	// Validate and parse statuses
 	var statusFilters []backend.Status
 	includeDone := listIncludeDone

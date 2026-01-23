@@ -7,6 +7,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/alexbrand/backlog/internal/backend"
+	"github.com/alexbrand/backlog/internal/config"
 )
 
 // TableFormatter outputs data in a human-readable table format.
@@ -180,5 +181,26 @@ func (f *TableFormatter) FormatSynced(w io.Writer, result *backend.SyncResult) e
 // FormatError outputs an error message.
 func (f *TableFormatter) FormatError(w io.Writer, code string, message string, details map[string]any) error {
 	fmt.Fprintf(w, "error: %s\n", message)
+	return nil
+}
+
+// FormatConfig outputs configuration.
+func (f *TableFormatter) FormatConfig(w io.Writer, cfg *config.Config) error {
+	fmt.Fprintf(w, "Configuration:\n")
+	fmt.Fprintf(w, "  Version: %d\n", cfg.Version)
+	fmt.Fprintf(w, "  Default Workspace: %s\n", cfg.Defaults.Workspace)
+	return nil
+}
+
+// FormatHealthCheck outputs health check results.
+func (f *TableFormatter) FormatHealthCheck(w io.Writer, backendName string, ws *config.Workspace, status *backend.HealthStatus) error {
+	if status.OK {
+		fmt.Fprintf(w, "%s: healthy (%v)\n", backendName, status.Latency)
+	} else {
+		fmt.Fprintf(w, "%s: unhealthy - %s\n", backendName, status.Message)
+	}
+	if ws != nil && ws.Project > 0 {
+		fmt.Fprintf(w, "project: %d\n", ws.Project)
+	}
 	return nil
 }

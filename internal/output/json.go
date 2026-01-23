@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/alexbrand/backlog/internal/backend"
+	"github.com/alexbrand/backlog/internal/config"
 )
 
 // JSONFormatter outputs data in JSON format.
@@ -36,27 +37,34 @@ func (f *JSONFormatter) FormatComments(w io.Writer, comments []backend.Comment) 
 // FormatCreated outputs the result of creating a task as JSON.
 func (f *JSONFormatter) FormatCreated(w io.Writer, task *backend.Task) error {
 	return f.writeJSON(w, map[string]any{
-		"id":    task.ID,
-		"title": task.Title,
-		"url":   task.URL,
+		"id":       task.ID,
+		"title":    task.Title,
+		"url":      task.URL,
+		"status":   task.Status,
+		"labels":   task.Labels,
+		"priority": task.Priority,
 	})
 }
 
 // FormatMoved outputs the result of moving a task as JSON.
 func (f *JSONFormatter) FormatMoved(w io.Writer, task *backend.Task, oldStatus, newStatus backend.Status) error {
 	return f.writeJSON(w, map[string]any{
-		"id":     task.ID,
-		"title":  task.Title,
-		"status": newStatus,
+		"id":       task.ID,
+		"title":    task.Title,
+		"status":   newStatus,
+		"labels":   task.Labels,
+		"priority": task.Priority,
 	})
 }
 
 // FormatUpdated outputs the result of updating a task as JSON.
 func (f *JSONFormatter) FormatUpdated(w io.Writer, task *backend.Task) error {
 	return f.writeJSON(w, map[string]any{
-		"id":    task.ID,
-		"title": task.Title,
-		"url":   task.URL,
+		"id":       task.ID,
+		"title":    task.Title,
+		"url":      task.URL,
+		"labels":   task.Labels,
+		"priority": task.Priority,
 	})
 }
 
@@ -75,10 +83,11 @@ func (f *JSONFormatter) FormatClaimed(w io.Writer, task *backend.Task, agentID s
 // FormatReleased outputs the result of releasing a task as JSON.
 func (f *JSONFormatter) FormatReleased(w io.Writer, task *backend.Task) error {
 	return f.writeJSON(w, map[string]any{
-		"id":     task.ID,
-		"title":  task.Title,
-		"status": task.Status,
-		"url":    task.URL,
+		"id":       task.ID,
+		"title":    task.Title,
+		"status":   task.Status,
+		"url":      task.URL,
+		"assignee": task.Assignee,
 	})
 }
 
@@ -107,6 +116,31 @@ func (f *JSONFormatter) FormatError(w io.Writer, code string, message string, de
 		errObj["error"].(map[string]any)["details"] = map[string]any{}
 	}
 	return f.writeJSON(w, errObj)
+}
+
+// FormatConfig outputs configuration as JSON.
+func (f *JSONFormatter) FormatConfig(w io.Writer, cfg *config.Config) error {
+	return f.writeJSON(w, cfg)
+}
+
+// FormatHealthCheck outputs health check results as JSON.
+func (f *JSONFormatter) FormatHealthCheck(w io.Writer, backendName string, ws *config.Workspace, status *backend.HealthStatus) error {
+	result := map[string]any{
+		"backend": backendName,
+		"healthy": status.OK,
+		"message": status.Message,
+		"latency": status.Latency.String(),
+	}
+	if ws != nil {
+		wsInfo := map[string]any{}
+		if ws.Project > 0 {
+			wsInfo["project"] = ws.Project
+		}
+		if len(wsInfo) > 0 {
+			result["workspace"] = wsInfo
+		}
+	}
+	return f.writeJSON(w, result)
 }
 
 // writeJSON encodes the value as indented JSON and writes it to w.

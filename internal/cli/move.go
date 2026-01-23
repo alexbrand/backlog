@@ -52,7 +52,9 @@ func runMove(id, statusStr, comment string) error {
 	// Get the current task first to capture old status
 	currentTask, err := b.Get(id)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		// Check if this is a "not found" error (case-insensitive check for 404/Not Found)
+		errLower := strings.ToLower(err.Error())
+		if strings.Contains(errLower, "not found") || strings.Contains(errLower, "404") {
 			return NotFoundError(err.Error())
 		}
 		return err
@@ -63,7 +65,9 @@ func runMove(id, statusStr, comment string) error {
 	// Move the task
 	task, err := b.Move(id, status)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		// Check if this is a "not found" error (case-insensitive check for 404/Not Found)
+		errLower := strings.ToLower(err.Error())
+		if strings.Contains(errLower, "not found") || strings.Contains(errLower, "404") {
 			return NotFoundError(err.Error())
 		}
 		return err

@@ -7,6 +7,7 @@ import (
 
 	"github.com/alexbrand/backlog/internal/backend"
 	"github.com/alexbrand/backlog/internal/github"
+	"github.com/alexbrand/backlog/internal/linear"
 	"github.com/alexbrand/backlog/internal/local"
 	"github.com/alexbrand/backlog/internal/output"
 	"github.com/spf13/cobra"
@@ -66,8 +67,12 @@ func runClaim(id string) error {
 		if _, isGitHubConflict := err.(*github.ClaimConflictError); isGitHubConflict {
 			return ConflictError(err.Error())
 		}
-		// Check for not found error
-		if strings.Contains(err.Error(), "not found") {
+		if _, isLinearConflict := err.(*linear.ClaimConflictError); isLinearConflict {
+			return ConflictError(err.Error())
+		}
+		// Check for not found error (case-insensitive check for 404/Not Found)
+		errLower := strings.ToLower(err.Error())
+		if strings.Contains(errLower, "not found") || strings.Contains(errLower, "404") {
 			return NotFoundError(err.Error())
 		}
 		return err

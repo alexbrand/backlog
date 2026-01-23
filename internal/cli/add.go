@@ -101,7 +101,10 @@ func runAdd(title string) error {
 		return fmt.Errorf("failed to create task: %w", err)
 	}
 
-	// Output the result
+	// Output the result (unless quiet mode is enabled)
+	if IsQuiet() {
+		return nil
+	}
 	formatter := output.New(output.Format(GetFormat()))
 	return formatter.FormatCreated(os.Stdout, task)
 }

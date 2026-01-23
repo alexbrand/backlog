@@ -98,9 +98,11 @@ func (l *Local) Connect(cfg backend.Config) error {
 	// Set git sync
 	l.gitSync = wsCfg.GitSync
 
-	// Verify the .backlog directory exists
+	// Create the .backlog directory if it doesn't exist
 	if _, err := os.Stat(l.path); os.IsNotExist(err) {
-		return fmt.Errorf("backlog directory does not exist: %s", l.path)
+		if err := l.initDirectory(); err != nil {
+			return fmt.Errorf("failed to create backlog directory: %w", err)
+		}
 	}
 
 	l.connected = true
@@ -528,6 +530,32 @@ func (l *Local) AddComment(id string, body string) (*backend.Comment, error) {
 }
 
 // Helper functions
+
+// initDirectory creates the backlog directory structure with all status subdirectories.
+func (l *Local) initDirectory() error {
+	// Create the main backlog directory
+	if err := os.MkdirAll(l.path, 0755); err != nil {
+		return fmt.Errorf("failed to create backlog directory: %w", err)
+	}
+
+	// Create status subdirectories
+	statuses := []backend.Status{
+		backend.StatusBacklog,
+		backend.StatusTodo,
+		backend.StatusInProgress,
+		backend.StatusReview,
+		backend.StatusDone,
+	}
+
+	for _, status := range statuses {
+		statusPath := filepath.Join(l.path, string(status))
+		if err := os.MkdirAll(statusPath, 0755); err != nil {
+			return fmt.Errorf("failed to create status directory %s: %w", status, err)
+		}
+	}
+
+	return nil
+}
 
 // findTask finds a task by ID across all status directories.
 func (l *Local) findTask(id string) (*backend.Task, error) {

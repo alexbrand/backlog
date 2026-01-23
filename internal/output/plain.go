@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/alexbrand/backlog/internal/backend"
+	"github.com/alexbrand/backlog/internal/config"
 )
 
 // PlainFormatter outputs data in plain text format, suitable for scripting.
@@ -112,5 +113,21 @@ func (f *PlainFormatter) FormatSynced(w io.Writer, result *backend.SyncResult) e
 // FormatError outputs an error in plain format.
 func (f *PlainFormatter) FormatError(w io.Writer, code string, message string, details map[string]any) error {
 	fmt.Fprintf(w, "error: %s\n", message)
+	return nil
+}
+
+// FormatConfig outputs configuration in plain format.
+func (f *PlainFormatter) FormatConfig(w io.Writer, cfg *config.Config) error {
+	fmt.Fprintf(w, "%s\n", cfg.Defaults.Workspace)
+	return nil
+}
+
+// FormatHealthCheck outputs health check results in plain format.
+func (f *PlainFormatter) FormatHealthCheck(w io.Writer, backendName string, ws *config.Workspace, status *backend.HealthStatus) error {
+	if status.OK {
+		fmt.Fprintf(w, "%s\thealthy\t%v\n", backendName, status.Latency)
+	} else {
+		fmt.Fprintf(w, "%s\tunhealthy\t%s\n", backendName, status.Message)
+	}
 	return nil
 }

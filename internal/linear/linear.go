@@ -1376,21 +1376,41 @@ func (l *Linear) Release(id string) error {
 		return errors.New("failed to get issue ID")
 	}
 
-	// Build new label list without agent labels
+	// Check who currently claims this task
 	agentLabelPrefix := l.agentLabelPrefix + ":"
+	claimedBy := ""
 	labelIDs := []string{}
 	if labelsData, ok := issue["labels"].(map[string]any); ok {
 		if nodes, ok := labelsData["nodes"].([]any); ok {
 			for _, n := range nodes {
 				if label, ok := n.(map[string]any); ok {
 					name := getString(label, "name")
-					if !strings.HasPrefix(name, agentLabelPrefix) {
+					if strings.HasPrefix(name, agentLabelPrefix) {
+						claimedBy = strings.TrimPrefix(name, agentLabelPrefix)
+					} else {
 						if id := getString(label, "id"); id != "" {
 							labelIDs = append(labelIDs, id)
 						}
 					}
 				}
 			}
+		}
+	}
+
+	// Check if the task is claimed
+	if claimedBy == "" {
+		return &ReleaseConflictError{
+			TaskID:     issueID,
+			NotClaimed: true,
+		}
+	}
+
+	// Check if the task is claimed by the current agent
+	if claimedBy != l.agentID {
+		return &ReleaseConflictError{
+			TaskID:       issueID,
+			ClaimedBy:    claimedBy,
+			CurrentAgent: l.agentID,
 		}
 	}
 
@@ -1870,7 +1890,7 @@ func (l *Linear) normalizeID(id string) string {
 // issueToTask converts a Linear Issue to a backend Task.
 func (l *Linear) issueToTask(issue map[string]any) *backend.Task {
 	task := &backend.Task{
-		ID:          "LIN-" + getString(issue, "identifier"),
+		ID:          getString(issue, "identifier"),
 		Title:       getString(issue, "title"),
 		Description: getString(issue, "description"),
 		URL:         getString(issue, "url"),
@@ -1964,6 +1984,22 @@ type ClaimConflictError struct {
 
 func (e *ClaimConflictError) Error() string {
 	return fmt.Sprintf("task %s is already claimed by agent %s", e.TaskID, e.ClaimedBy)
+}
+
+// ReleaseConflictError represents an error when trying to release a task that isn't claimed
+// by the current agent.
+type ReleaseConflictError struct {
+	TaskID       string
+	ClaimedBy    string
+	CurrentAgent string
+	NotClaimed   bool
+}
+
+func (e *ReleaseConflictError) Error() string {
+	if e.NotClaimed {
+		return fmt.Sprintf("task %s is not claimed", e.TaskID)
+	}
+	return fmt.Sprintf("task %s is claimed by agent %s, not by %s", e.TaskID, e.ClaimedBy, e.CurrentAgent)
 }
 
 // Register registers the Linear backend with the registry.

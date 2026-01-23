@@ -47,8 +47,9 @@ func runShow(id string) error {
 	// Get the task
 	task, err := b.Get(id)
 	if err != nil {
-		// Check if this is a "not found" error
-		if strings.Contains(err.Error(), "not found") {
+		// Check if this is a "not found" error (case-insensitive check for 404/Not Found)
+		errLower := strings.ToLower(err.Error())
+		if strings.Contains(errLower, "not found") || strings.Contains(errLower, "404") {
 			return NotFoundError(err.Error())
 		}
 		return err

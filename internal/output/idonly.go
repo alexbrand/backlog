@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/alexbrand/backlog/internal/backend"
+	"github.com/alexbrand/backlog/internal/config"
 )
 
 // IDOnlyFormatter outputs only task IDs, one per line.
@@ -78,5 +79,17 @@ func (f *IDOnlyFormatter) FormatSynced(w io.Writer, result *backend.SyncResult) 
 // FormatError outputs an error message (errors are always shown).
 func (f *IDOnlyFormatter) FormatError(w io.Writer, code string, message string, details map[string]any) error {
 	fmt.Fprintf(w, "error: %s\n", message)
+	return nil
+}
+
+// FormatConfig outputs configuration (empty for id-only format).
+func (f *IDOnlyFormatter) FormatConfig(w io.Writer, cfg *config.Config) error {
+	// id-only format doesn't output config
+	return nil
+}
+
+// FormatHealthCheck outputs health check results (empty for id-only format).
+func (f *IDOnlyFormatter) FormatHealthCheck(w io.Writer, backendName string, ws *config.Workspace, status *backend.HealthStatus) error {
+	// id-only format doesn't output health status
 	return nil
 }

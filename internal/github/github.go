@@ -31,7 +31,7 @@ var defaultStatusLabels = map[backend.Status][]string{
 	backend.StatusBacklog:    {},               // open issue, no status label
 	backend.StatusTodo:       {"ready"},        // open issue with "ready" label
 	backend.StatusInProgress: {"in-progress"},  // open issue with "in-progress" label
-	backend.StatusReview:     {"review"},       // open issue with "review" label
+	backend.StatusReview:     {"needs-review"}, // open issue with "needs-review" label
 	backend.StatusDone:       {},               // closed issue
 }
 

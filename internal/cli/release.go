@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/alexbrand/backlog/internal/backend"
+	"github.com/alexbrand/backlog/internal/linear"
 	"github.com/alexbrand/backlog/internal/local"
 	"github.com/alexbrand/backlog/internal/output"
 	"github.com/spf13/cobra"
@@ -59,7 +60,9 @@ func runRelease(id, comment string) error {
 	// Get the task first so we can display it in the output
 	task, err := b.Get(id)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		// Check if this is a "not found" error (case-insensitive check for 404/Not Found)
+		errLower := strings.ToLower(err.Error())
+		if strings.Contains(errLower, "not found") || strings.Contains(errLower, "404") {
 			return NotFoundError(err.Error())
 		}
 		return err
@@ -67,11 +70,16 @@ func runRelease(id, comment string) error {
 
 	// Release the task
 	if err := claimer.Release(id); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		// Check if this is a "not found" error (case-insensitive check for 404/Not Found)
+		errLower := strings.ToLower(err.Error())
+		if strings.Contains(errLower, "not found") || strings.Contains(errLower, "404") {
 			return NotFoundError(err.Error())
 		}
 		// Check for release conflict error (not claimed or claimed by different agent)
 		if _, isReleaseConflict := err.(*local.ReleaseConflictError); isReleaseConflict {
+			return ConflictError(err.Error())
+		}
+		if _, isLinearReleaseConflict := err.(*linear.ReleaseConflictError); isLinearReleaseConflict {
 			return ConflictError(err.Error())
 		}
 		return err
