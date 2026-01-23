@@ -201,6 +201,11 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the GitHub token is "([^"]*)"$`, theGitHubTokenIs)
 	ctx.Step(`^the GitHub issue "([^"]*)" should have label "([^"]*)"$`, theGitHubIssueShouldHaveLabel)
 	ctx.Step(`^the GitHub issue "([^"]*)" should be assigned to "([^"]*)"$`, theGitHubIssueShouldBeAssignedTo)
+
+	// GitHub Projects v2 steps
+	ctx.Step(`^a GitHub project (\d+) with columns:$`, aGitHubProjectWithColumns)
+	ctx.Step(`^the mock GitHub API has no project with ID (\d+)$`, theMockGitHubAPIHasNoProjectWithID)
+	ctx.Step(`^the project item for issue "([^"]*)" should be in column "([^"]*)"$`, theProjectItemShouldBeInColumn)
 }
 
 // aFreshBacklogDirectory creates a new empty .backlog directory.
@@ -2646,4 +2651,98 @@ func parseGitHubIssueNumber(issueID string) int {
 		return num
 	}
 	return 0
+}
+
+// ============================================================================
+// GitHub Projects v2 Step Definitions
+// ============================================================================
+
+// aGitHubProjectWithColumns sets up a mock GitHub Project with the specified columns.
+func aGitHubProjectWithColumns(ctx context.Context, projectNumber int, table *godog.Table) (context.Context, error) {
+	server := getMockGitHubServer(ctx)
+	if server == nil {
+		return ctx, fmt.Errorf("mock GitHub API server not running - call 'a mock GitHub API server is running' first")
+	}
+
+	if len(table.Rows) < 2 {
+		return ctx, fmt.Errorf("table must have at least a header row and one data row")
+	}
+
+	header := table.Rows[0]
+	colIndex := make(map[string]int)
+	for i, cell := range header.Cells {
+		colIndex[cell.Value] = i
+	}
+
+	var columns []support.MockGitHubProjectColumn
+	for _, row := range table.Rows[1:] {
+		getValue := func(col string) string {
+			if idx, ok := colIndex[col]; ok && idx < len(row.Cells) {
+				return row.Cells[idx].Value
+			}
+			return ""
+		}
+
+		column := support.MockGitHubProjectColumn{
+			Name: getValue("name"),
+			ID:   getValue("id"),
+		}
+
+		// Generate ID if not provided
+		if column.ID == "" {
+			column.ID = fmt.Sprintf("COL_%s", strings.ReplaceAll(column.Name, " ", "_"))
+		}
+
+		columns = append(columns, column)
+	}
+
+	server.SetProject(projectNumber, fmt.Sprintf("Project %d", projectNumber), columns)
+	return ctx, nil
+}
+
+// theMockGitHubAPIHasNoProjectWithID marks a project ID as invalid.
+func theMockGitHubAPIHasNoProjectWithID(ctx context.Context, projectID int) (context.Context, error) {
+	server := getMockGitHubServer(ctx)
+	if server == nil {
+		return ctx, fmt.Errorf("mock GitHub API server not running - call 'a mock GitHub API server is running' first")
+	}
+
+	server.SetInvalidProjectID(projectID)
+	return ctx, nil
+}
+
+// theProjectItemShouldBeInColumn verifies that an issue is in the specified project column.
+func theProjectItemShouldBeInColumn(ctx context.Context, issueID, columnName string) error {
+	server := getMockGitHubServer(ctx)
+	if server == nil {
+		return fmt.Errorf("mock GitHub API server not running")
+	}
+
+	issueNumber := parseGitHubIssueNumber(issueID)
+	if issueNumber <= 0 {
+		return fmt.Errorf("invalid issue ID format: %s (expected 'GH-{number}' or '{number}')", issueID)
+	}
+
+	// Find the item in any project
+	// For now, we assume there's only one project configured
+	for projectID, items := range server.ProjectItems {
+		if item, ok := items[issueNumber]; ok {
+			project := server.GetProject(projectID)
+			if project == nil {
+				continue
+			}
+
+			// Find the column name from the column ID
+			for _, col := range project.Columns {
+				if col.ID == item.ColumnID {
+					if col.Name == columnName {
+						return nil
+					}
+					return fmt.Errorf("issue %s is in column %q, expected %q", issueID, col.Name, columnName)
+				}
+			}
+		}
+	}
+
+	return fmt.Errorf("issue %s is not in any project", issueID)
 }

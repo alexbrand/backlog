@@ -30,6 +30,25 @@ type MockGitHubComment struct {
 	Body   string
 }
 
+// MockGitHubProjectColumn represents a column in a GitHub Project.
+type MockGitHubProjectColumn struct {
+	ID   string
+	Name string
+}
+
+// MockGitHubProject represents a GitHub Project v2.
+type MockGitHubProject struct {
+	ID      int
+	Title   string
+	Columns []MockGitHubProjectColumn
+}
+
+// MockGitHubProjectItem represents an item (issue) in a GitHub Project.
+type MockGitHubProjectItem struct {
+	IssueNumber int
+	ColumnID    string
+}
+
 // MockGitHubServer provides a mock implementation of the GitHub API for testing.
 type MockGitHubServer struct {
 	Server *httptest.Server
@@ -58,6 +77,15 @@ type MockGitHubServer struct {
 
 	// NextCommentID is the next comment ID to assign
 	NextCommentID int
+
+	// Projects stored by project number
+	Projects map[int]*MockGitHubProject
+
+	// ProjectItems stored by project ID, maps issue number to project item
+	ProjectItems map[int]map[int]*MockGitHubProjectItem
+
+	// InvalidProjectIDs tracks project IDs that should return errors
+	InvalidProjectIDs map[int]bool
 }
 
 // NewMockGitHubServer creates and starts a new mock GitHub API server.
@@ -68,12 +96,18 @@ func NewMockGitHubServer() *MockGitHubServer {
 		AuthenticatedUser: "test-user",
 		NextIssueNumber:   1,
 		NextCommentID:     1,
+		Projects:          make(map[int]*MockGitHubProject),
+		ProjectItems:      make(map[int]map[int]*MockGitHubProjectItem),
+		InvalidProjectIDs: make(map[int]bool),
 	}
 
 	mux := http.NewServeMux()
 
 	// GET /user - authenticated user info
 	mux.HandleFunc("/user", mock.handleUser)
+
+	// POST /graphql - GraphQL API for Projects v2
+	mux.HandleFunc("/graphql", mock.handleGraphQL)
 
 	// GET /repos/{owner}/{repo}/issues - list issues
 	// POST /repos/{owner}/{repo}/issues - create issue
@@ -90,6 +124,57 @@ func (m *MockGitHubServer) Close() {
 	if m.Server != nil {
 		m.Server.Close()
 	}
+}
+
+// SetProject sets a mock project with the given columns.
+func (m *MockGitHubServer) SetProject(projectID int, title string, columns []MockGitHubProjectColumn) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.Projects[projectID] = &MockGitHubProject{
+		ID:      projectID,
+		Title:   title,
+		Columns: columns,
+	}
+	if m.ProjectItems[projectID] == nil {
+		m.ProjectItems[projectID] = make(map[int]*MockGitHubProjectItem)
+	}
+}
+
+// SetProjectItem adds an issue to a project in a specific column.
+func (m *MockGitHubServer) SetProjectItem(projectID int, issueNumber int, columnID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.ProjectItems[projectID] == nil {
+		m.ProjectItems[projectID] = make(map[int]*MockGitHubProjectItem)
+	}
+	m.ProjectItems[projectID][issueNumber] = &MockGitHubProjectItem{
+		IssueNumber: issueNumber,
+		ColumnID:    columnID,
+	}
+}
+
+// GetProjectItem retrieves a project item for assertions.
+func (m *MockGitHubServer) GetProjectItem(projectID int, issueNumber int) *MockGitHubProjectItem {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if items, ok := m.ProjectItems[projectID]; ok {
+		return items[issueNumber]
+	}
+	return nil
+}
+
+// GetProject retrieves a project for assertions.
+func (m *MockGitHubServer) GetProject(projectID int) *MockGitHubProject {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.Projects[projectID]
+}
+
+// SetInvalidProjectID marks a project ID as invalid (will return error).
+func (m *MockGitHubServer) SetInvalidProjectID(projectID int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.InvalidProjectIDs[projectID] = true
 }
 
 // SetIssues sets the mock issues.
@@ -670,5 +755,237 @@ func (m *MockGitHubServer) writeError(w http.ResponseWriter, status int, message
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message":           message,
 		"documentation_url": documentation,
+	})
+}
+
+// handleGraphQL handles POST /graphql requests for GitHub Projects v2.
+func (m *MockGitHubServer) handleGraphQL(w http.ResponseWriter, r *http.Request) {
+	if !m.validateAuth(w, r) {
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		m.writeGraphQLError(w, "Method not allowed")
+		return
+	}
+
+	var req struct {
+		Query     string                 `json:"query"`
+		Variables map[string]interface{} `json:"variables"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		m.writeGraphQLError(w, "Invalid JSON: "+err.Error())
+		return
+	}
+
+	// Parse and handle different GraphQL queries/mutations
+	query := strings.TrimSpace(req.Query)
+
+	// Check for project query patterns
+	if strings.Contains(query, "projectV2") || strings.Contains(query, "ProjectV2") {
+		m.handleProjectQuery(w, query, req.Variables)
+		return
+	}
+
+	// Default: return empty data
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]interface{}{},
+	})
+}
+
+// handleProjectQuery handles GraphQL queries related to projects.
+func (m *MockGitHubServer) handleProjectQuery(w http.ResponseWriter, query string, variables map[string]interface{}) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// Extract project number from variables or query
+	var projectNumber int
+	if num, ok := variables["projectNumber"].(float64); ok {
+		projectNumber = int(num)
+	} else if num, ok := variables["number"].(float64); ok {
+		projectNumber = int(num)
+	}
+
+	// Check if this is an invalid project ID
+	if m.InvalidProjectIDs[projectNumber] {
+		m.writeGraphQLError(w, fmt.Sprintf("Could not find project with number %d", projectNumber))
+		return
+	}
+
+	// Check if project exists
+	project, exists := m.Projects[projectNumber]
+	if !exists && projectNumber > 0 {
+		// If no project is set up but a query is made, return empty but valid response
+		// This mimics GitHub behavior when project doesn't exist
+		m.writeGraphQLError(w, fmt.Sprintf("Could not find project with number %d", projectNumber))
+		return
+	}
+
+	// Build response based on query type
+	if strings.Contains(query, "field") || strings.Contains(query, "Field") {
+		// Query for project fields (columns)
+		m.handleProjectFieldsQuery(w, project)
+		return
+	}
+
+	if strings.Contains(query, "items") {
+		// Query for project items
+		m.handleProjectItemsQuery(w, projectNumber, project)
+		return
+	}
+
+	// Default project info query
+	m.handleProjectInfoQuery(w, project)
+}
+
+// handleProjectInfoQuery returns basic project information.
+func (m *MockGitHubServer) handleProjectInfoQuery(w http.ResponseWriter, project *MockGitHubProject) {
+	if project == nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"data": map[string]interface{}{
+				"repository": map[string]interface{}{
+					"projectV2": nil,
+				},
+			},
+		})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]interface{}{
+			"repository": map[string]interface{}{
+				"projectV2": map[string]interface{}{
+					"id":     fmt.Sprintf("PVT_%d", project.ID),
+					"title":  project.Title,
+					"number": project.ID,
+				},
+			},
+		},
+	})
+}
+
+// handleProjectFieldsQuery returns project fields (columns/status options).
+func (m *MockGitHubServer) handleProjectFieldsQuery(w http.ResponseWriter, project *MockGitHubProject) {
+	if project == nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"data": map[string]interface{}{
+				"repository": map[string]interface{}{
+					"projectV2": nil,
+				},
+			},
+		})
+		return
+	}
+
+	// Build field options from columns
+	var options []map[string]interface{}
+	for _, col := range project.Columns {
+		options = append(options, map[string]interface{}{
+			"id":   col.ID,
+			"name": col.Name,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]interface{}{
+			"repository": map[string]interface{}{
+				"projectV2": map[string]interface{}{
+					"id":     fmt.Sprintf("PVT_%d", project.ID),
+					"title":  project.Title,
+					"number": project.ID,
+					"field": map[string]interface{}{
+						"__typename": "ProjectV2SingleSelectField",
+						"id":         "PVTSSF_Status",
+						"name":       "Status",
+						"options":    options,
+					},
+				},
+			},
+		},
+	})
+}
+
+// handleProjectItemsQuery returns project items (issues on the board).
+func (m *MockGitHubServer) handleProjectItemsQuery(w http.ResponseWriter, projectID int, project *MockGitHubProject) {
+	if project == nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"data": map[string]interface{}{
+				"repository": map[string]interface{}{
+					"projectV2": nil,
+				},
+			},
+		})
+		return
+	}
+
+	// Build items list
+	var items []map[string]interface{}
+	if projectItems, ok := m.ProjectItems[projectID]; ok {
+		for _, item := range projectItems {
+			issue := m.Issues[item.IssueNumber]
+			if issue == nil {
+				continue
+			}
+
+			// Find column name
+			columnName := ""
+			for _, col := range project.Columns {
+				if col.ID == item.ColumnID {
+					columnName = col.Name
+					break
+				}
+			}
+
+			items = append(items, map[string]interface{}{
+				"id": fmt.Sprintf("PVTI_%d", item.IssueNumber),
+				"content": map[string]interface{}{
+					"__typename": "Issue",
+					"number":     issue.Number,
+					"title":      issue.Title,
+					"state":      strings.ToUpper(issue.State),
+				},
+				"fieldValueByName": map[string]interface{}{
+					"__typename": "ProjectV2ItemFieldSingleSelectValue",
+					"name":       columnName,
+					"optionId":   item.ColumnID,
+				},
+			})
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]interface{}{
+			"repository": map[string]interface{}{
+				"projectV2": map[string]interface{}{
+					"id":     fmt.Sprintf("PVT_%d", project.ID),
+					"title":  project.Title,
+					"number": project.ID,
+					"items": map[string]interface{}{
+						"nodes": items,
+					},
+				},
+			},
+		},
+	})
+}
+
+// writeGraphQLError writes a GraphQL-style error response.
+func (m *MockGitHubServer) writeGraphQLError(w http.ResponseWriter, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"errors": []map[string]interface{}{
+			{
+				"message": message,
+				"type":    "NOT_FOUND",
+			},
+		},
 	})
 }
