@@ -6,6 +6,8 @@ import (
 
 	"github.com/cucumber/godog"
 	"github.com/cucumber/godog/colors"
+
+	"github.com/alexbrand/backlog/spec/steps"
 )
 
 func TestFeatures(t *testing.T) {
@@ -28,6 +30,6 @@ func TestFeatures(t *testing.T) {
 }
 
 func InitializeScenario(ctx *godog.ScenarioContext) {
-	// Step definitions will be registered here
-	// Each phase will add its own step definitions
+	// Register common step definitions
+	steps.InitializeCommonSteps(ctx)
 }

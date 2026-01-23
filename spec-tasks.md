@@ -25,16 +25,16 @@ This plan covers implementing a Gherkin-based executable specification using [go
 - [x] Implement config file generator for test workspaces
 
 ### Common Step Definitions
-- [ ] Implement "Given a fresh backlog directory" — creates temp `.backlog/`
-- [ ] Implement "Given a backlog with the following tasks:" — table-based setup
-- [ ] Implement "When I run {string}" — executes CLI command
-- [ ] Implement "Then the exit code should be {int}"
-- [ ] Implement "Then stdout should contain {string}"
-- [ ] Implement "Then stderr should contain {string}"
-- [ ] Implement "Then stdout should be empty"
-- [ ] Implement "Then stderr should be empty"
-- [ ] Implement "Then the output should match:" — docstring comparison
-- [ ] Implement "Then the JSON output should have {string} equal to {string}"
+- [x] Implement "Given a fresh backlog directory" — creates temp `.backlog/`
+- [x] Implement "Given a backlog with the following tasks:" — table-based setup
+- [x] Implement "When I run {string}" — executes CLI command
+- [x] Implement "Then the exit code should be {int}"
+- [x] Implement "Then stdout should contain {string}"
+- [x] Implement "Then stderr should contain {string}"
+- [x] Implement "Then stdout should be empty"
+- [x] Implement "Then stderr should be empty"
+- [x] Implement "Then the output should match:" — docstring comparison
+- [x] Implement "Then the JSON output should have {string} equal to {string}"
 
 ---
 
@@ -373,7 +373,7 @@ This plan covers implementing a Gherkin-based executable specification using [go
 
 | Phase | Status | Feature Files | Scenarios |
 |-------|--------|---------------|-----------|
-| Phase 0: Infrastructure | In Progress | 0 | 0 |
+| Phase 0: Infrastructure | Complete | 0 | 0 |
 | Phase 1: Local CRUD | Not Started | 0 | 0 |
 | Phase 1b: Output Formats | Not Started | 0 | 0 |
 | Phase 1c: Configuration | Not Started | 0 | 0 |
