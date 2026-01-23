@@ -1,6 +1,6 @@
 # Makefile for backlog CLI
 
-.PHONY: spec spec-local spec-github spec-linear spec-all spec-coverage spec-coverage-html spec-report spec-report-html
+.PHONY: spec spec-local spec-github spec-linear spec-all spec-coverage spec-coverage-html spec-report spec-report-html spec-docs
 
 # Run Gherkin specs (excludes @remote tests by default)
 spec:
@@ -43,3 +43,8 @@ spec-report:
 spec-report-html: spec-report
 	cd spec && go run ./cmd/genreport -input cucumber.json -output report.html
 	@echo "HTML spec report generated: spec/report.html"
+
+# Generate living documentation from feature files (no test execution required)
+spec-docs:
+	cd spec && go run ./cmd/gendocs -features features -output docs.html
+	@echo "Living documentation generated: spec/docs.html"

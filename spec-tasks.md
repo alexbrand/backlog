@@ -392,7 +392,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Add spec README explaining how to run tests
 - [x] Document how to add new scenarios
 - [x] Document step definition conventions
-- [ ] Generate living documentation from features
+- [x] Generate living documentation from features
 
 ---
 
