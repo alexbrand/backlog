@@ -156,7 +156,7 @@
 ## Phase 5: GitHub Backend — Projects
 
 ### GitHub Projects v2 Integration
-- [ ] Implement GraphQL API client for Projects
+- [x] Implement GraphQL API client for Projects
 - [ ] Implement project field discovery
 - [ ] Implement column-based status (instead of labels)
 - [ ] Add `project` config option (project number)
