@@ -71,7 +71,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: List with multiple status values
 - [x] Scenario: List with priority filter
 - [x] Scenario: List with label filter
-- [ ] Scenario: List with assignee filter
+- [x] Scenario: List with assignee filter
 - [ ] Scenario: List unassigned tasks
 - [ ] Scenario: List with limit
 - [ ] Scenario: List returns empty when no tasks match

@@ -164,3 +164,19 @@ Feature: Listing Tasks
     And stdout should not contain "New feature"
     And stdout should not contain "Documentation"
     And stdout should not contain "API feature"
+
+  Scenario: List with assignee filter
+    Given a backlog with the following tasks:
+      | id    | title           | status      | priority | assignee |
+      | task1 | Alice's task    | todo        | high     | alice    |
+      | task2 | Bob's task      | in-progress | medium   | bob      |
+      | task3 | Alice's other   | backlog     | low      | alice    |
+      | task4 | Unassigned      | todo        | urgent   |          |
+      | task5 | Carol's task    | review      | medium   | carol    |
+    When I run "backlog list --assignee=alice"
+    Then the exit code should be 0
+    And stdout should contain "Alice's task"
+    And stdout should contain "Alice's other"
+    And stdout should not contain "Bob's task"
+    And stdout should not contain "Unassigned"
+    And stdout should not contain "Carol's task"
