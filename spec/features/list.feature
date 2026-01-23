@@ -16,3 +16,31 @@ Feature: Listing Tasks
     And stdout should contain "Second task"
     And stdout should contain "Backlog task"
     And stdout should not contain "Completed task"
+
+  Scenario: List tasks in table format (default)
+    Given a backlog with the following tasks:
+      | id    | title           | status      | priority | assignee |
+      | task1 | First task      | todo        | high     | alice    |
+      | task2 | Second task     | in-progress | medium   |          |
+      | task3 | Third task      | backlog     | low      | bob      |
+    When I run "backlog list"
+    Then the exit code should be 0
+    And stdout should contain "ID"
+    And stdout should contain "STATUS"
+    And stdout should contain "PRIORITY"
+    And stdout should contain "TITLE"
+    And stdout should contain "ASSIGNEE"
+    And stdout should contain "task1"
+    And stdout should contain "todo"
+    And stdout should contain "high"
+    And stdout should contain "First task"
+    And stdout should contain "alice"
+    And stdout should contain "task2"
+    And stdout should contain "in-progress"
+    And stdout should contain "medium"
+    And stdout should contain "Second task"
+    And stdout should contain "task3"
+    And stdout should contain "backlog"
+    And stdout should contain "low"
+    And stdout should contain "Third task"
+    And stdout should contain "bob"
