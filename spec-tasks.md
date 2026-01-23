@@ -391,7 +391,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 ### Spec Documentation
 - [x] Add spec README explaining how to run tests
 - [x] Document how to add new scenarios
-- [ ] Document step definition conventions
+- [x] Document step definition conventions
 - [ ] Generate living documentation from features
 
 ---

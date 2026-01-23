@@ -408,3 +408,209 @@ After adding scenarios, update the `spec-tasks.md` file to track what was added:
 
 1. Mark any related tasks as complete
 2. Update the Progress Summary table with new scenario counts
+
+## Step Definition Conventions
+
+This section documents the conventions used when writing step definitions in `spec/steps/common_steps.go`.
+
+### Function Naming
+
+Step definition functions use **camelCase** names that reflect the step text:
+
+| Gherkin Step | Function Name |
+|--------------|---------------|
+| `Given a fresh backlog directory` | `aFreshBacklogDirectory` |
+| `When I run "command"` | `iRun` |
+| `Then the exit code should be N` | `theExitCodeShouldBe` |
+
+### Function Signatures
+
+Step definitions use two signature patterns depending on whether they modify context:
+
+**Steps that don't modify context (assertions):**
+
+```go
+func theExitCodeShouldBe(ctx context.Context, expected int) error {
+    result := getLastResult(ctx)
+    if result.ExitCode != expected {
+        return fmt.Errorf("expected exit code %d, got %d", expected, result.ExitCode)
+    }
+    return nil
+}
+```
+
+**Steps that modify context (setup/given steps):**
+
+```go
+func aFreshBacklogDirectory(ctx context.Context) (context.Context, error) {
+    env := getTestEnv(ctx)
+    if err := env.CreateBacklogDir(); err != nil {
+        return ctx, err
+    }
+    return ctx, nil
+}
+```
+
+**Steps with data tables:**
+
+```go
+func aBacklogWithTheFollowingTasks(ctx context.Context, table *godog.Table) (context.Context, error) {
+    // Parse table rows and create fixtures
+    return ctx, nil
+}
+```
+
+### Context Management
+
+Context values are managed using custom key types to avoid collisions:
+
+```go
+type contextKey string
+
+const (
+    testEnvKey    contextKey = "testEnv"
+    cliRunnerKey  contextKey = "cliRunner"
+    lastResultKey contextKey = "lastResult"
+)
+```
+
+Helper functions retrieve values from context:
+
+```go
+func getTestEnv(ctx context.Context) *support.TestEnv {
+    if env, ok := ctx.Value(testEnvKey).(*support.TestEnv); ok {
+        return env
+    }
+    return nil
+}
+```
+
+### Step Registration
+
+All steps are registered in `InitializeCommonSteps`:
+
+```go
+func InitializeCommonSteps(ctx *godog.ScenarioContext) {
+    // Before hook - set up test environment
+    ctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
+        env := support.NewTestEnv()
+        ctx = context.WithValue(ctx, testEnvKey, env)
+        // ... more setup
+        return ctx, nil
+    })
+
+    // After hook - clean up
+    ctx.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
+        env := getTestEnv(ctx)
+        if env != nil {
+            env.Cleanup()
+        }
+        return ctx, nil
+    })
+
+    // Step definitions
+    ctx.Step(`^a fresh backlog directory$`, aFreshBacklogDirectory)
+    ctx.Step(`^I run "([^"]*)"$`, iRun)
+    ctx.Step(`^the exit code should be (\d+)$`, theExitCodeShouldBe)
+}
+```
+
+### Regex Pattern Conventions
+
+| Pattern | Use Case | Example |
+|---------|----------|---------|
+| `"([^"]*)"` | Quoted string parameter | `"backlog add 'task'"` |
+| `(\d+)` | Integer parameter | Exit code `0` |
+| `^...$` | Anchored pattern | Prevents partial matches |
+| `(?:s)?` | Optional plural | `file` or `files` |
+
+### Error Handling
+
+Include context in error messages for debugging:
+
+```go
+func stdoutShouldContain(ctx context.Context, expected string) error {
+    result := getLastResult(ctx)
+    if !strings.Contains(result.Stdout, expected) {
+        return fmt.Errorf("expected stdout to contain %q\nstdout: %s\nstderr: %s",
+            expected, result.Stdout, result.Stderr)
+    }
+    return nil
+}
+```
+
+### Before/After Hooks
+
+**Before hook** runs at the start of each scenario:
+- Creates a fresh `TestEnv` with a temporary directory
+- Initializes the `CLIRunner`
+- Stores both in context
+
+**After hook** runs after each scenario:
+- Closes any mock servers (GitHub, Linear)
+- Cleans up the test environment (removes temp directory)
+- Restores any modified environment variables
+
+### Step Organization
+
+Steps in `common_steps.go` are organized into logical groups:
+
+1. **Given steps** - Setup and preconditions
+2. **When steps** - Actions (primarily `I run "command"`)
+3. **Then steps** - Assertions and verification
+4. **Config steps** - Configuration file manipulation
+5. **Task verification steps** - Task property assertions
+6. **Claim/Lock steps** - Agent coordination verification
+7. **Git sync steps** - Git repository verification
+8. **Mock API steps** - GitHub and Linear mock server setup
+
+### Support Package Integration
+
+Step definitions use utilities from the `support/` package:
+
+| Utility | Purpose |
+|---------|---------|
+| `TestEnv` | Isolated temp directory per scenario |
+| `CLIRunner` | Execute CLI commands, capture output |
+| `TaskFile` | Read and parse task markdown files |
+| `JSONParser` | Parse and query JSON output |
+| `MockGitHub` | Mock GitHub API server |
+| `MockLinear` | Mock Linear API server |
+
+### Data Table Processing
+
+When parsing Gherkin data tables, use column-aware value extraction:
+
+```go
+func aBacklogWithTheFollowingTasks(ctx context.Context, table *godog.Table) (context.Context, error) {
+    // Build column index from header row
+    colIndex := make(map[string]int)
+    for i, cell := range table.Rows[0].Cells {
+        colIndex[cell.Value] = i
+    }
+
+    // Process data rows
+    for _, row := range table.Rows[1:] {
+        getValue := func(col string) string {
+            if idx, ok := colIndex[col]; ok && idx < len(row.Cells) {
+                return row.Cells[idx].Value
+            }
+            return ""
+        }
+
+        id := getValue("id")
+        title := getValue("title")
+        // ... create fixture
+    }
+    return ctx, nil
+}
+```
+
+### Best Practices
+
+1. **Check for nil context values** - Always verify context values exist before using them
+2. **Use env.Path() for file paths** - Ensures paths are relative to the temp directory
+3. **Include output in errors** - Include stdout/stderr in error messages for debugging
+4. **Keep steps atomic** - Each step should do one thing well
+5. **Prefer reuse** - Check existing steps before creating new ones
+6. **Group related steps** - Keep related functionality together in the file
