@@ -90,8 +90,8 @@
 - [x] Handle "already claimed by same agent" as success (no-op) — `AlreadyOwned` flag in `ClaimResult`
 
 ### Comments
-- [ ] Implement `backlog comment <id> <message>`
-- [ ] Implement `--body-file` flag for comments
+- [x] Implement `backlog comment <id> <message>`
+- [x] Implement `--body-file` flag for comments
 - [ ] Implement `--comment` flag for `move` and `release` commands
 
 ---
