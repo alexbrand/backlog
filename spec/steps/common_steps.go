@@ -4,6 +4,7 @@ package steps
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/cucumber/godog"
@@ -79,6 +80,7 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	// Given steps
 	ctx.Step(`^a fresh backlog directory$`, aFreshBacklogDirectory)
 	ctx.Step(`^a backlog with the following tasks:$`, aBacklogWithTheFollowingTasks)
+	ctx.Step(`^a file "([^"]*)" with content "([^"]*)"$`, aFileWithContent)
 
 	// When steps
 	ctx.Step(`^I run "([^"]*)"$`, iRun)
@@ -91,6 +93,8 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^stderr should be empty$`, stderrShouldBeEmpty)
 	ctx.Step(`^the output should match:$`, theOutputShouldMatch)
 	ctx.Step(`^the JSON output should have "([^"]*)" equal to "([^"]*)"$`, theJSONOutputShouldHaveEqualTo)
+	ctx.Step(`^the directory "([^"]*)" should exist$`, theDirectoryShouldExist)
+	ctx.Step(`^the file "([^"]*)" should exist$`, theFileShouldExist)
 }
 
 // aFreshBacklogDirectory creates a new empty .backlog directory.
@@ -303,6 +307,66 @@ func theJSONOutputShouldHaveEqualTo(ctx context.Context, path, expected string) 
 	actual := jsonResult.GetString(path)
 	if actual != expected {
 		return fmt.Errorf("expected JSON path %q to be %q, got %q", path, expected, actual)
+	}
+
+	return nil
+}
+
+// aFileWithContent creates a file with the specified content.
+func aFileWithContent(ctx context.Context, path, content string) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	if err := env.CreateFile(path, content); err != nil {
+		return ctx, fmt.Errorf("failed to create file %q: %w", path, err)
+	}
+
+	return ctx, nil
+}
+
+// theDirectoryShouldExist verifies that a directory exists in the test environment.
+func theDirectoryShouldExist(ctx context.Context, path string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	fullPath := env.Path(path)
+	info, err := os.Stat(fullPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("directory %q does not exist", path)
+		}
+		return fmt.Errorf("error checking directory %q: %w", path, err)
+	}
+
+	if !info.IsDir() {
+		return fmt.Errorf("path %q exists but is not a directory", path)
+	}
+
+	return nil
+}
+
+// theFileShouldExist verifies that a file exists in the test environment.
+func theFileShouldExist(ctx context.Context, path string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	fullPath := env.Path(path)
+	info, err := os.Stat(fullPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("file %q does not exist", path)
+		}
+		return fmt.Errorf("error checking file %q: %w", path, err)
+	}
+
+	if info.IsDir() {
+		return fmt.Errorf("path %q exists but is a directory, not a file", path)
 	}
 
 	return nil

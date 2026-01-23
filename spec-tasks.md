@@ -41,11 +41,11 @@ This plan covers implementing a Gherkin-based executable specification using [go
 ## Phase 1: Local Backend — Basic CRUD Specs
 
 ### Feature: Initialization (`init.feature`)
-- [ ] Scenario: Initialize backlog in empty directory
-- [ ] Scenario: Initialize backlog in directory with existing files
-- [ ] Scenario: Initialize fails if `.backlog/` already exists
-- [ ] Scenario: Initialize creates all status directories
-- [ ] Scenario: Initialize creates config.yaml
+- [x] Scenario: Initialize backlog in empty directory
+- [x] Scenario: Initialize backlog in directory with existing files
+- [x] Scenario: Initialize fails if `.backlog/` already exists
+- [x] Scenario: Initialize creates all status directories
+- [x] Scenario: Initialize creates config.yaml
 
 ### Feature: Adding Tasks (`add.feature`)
 - [ ] Scenario: Add task with title only
@@ -374,7 +374,7 @@ This plan covers implementing a Gherkin-based executable specification using [go
 | Phase | Status | Feature Files | Scenarios |
 |-------|--------|---------------|-----------|
 | Phase 0: Infrastructure | Complete | 0 | 0 |
-| Phase 1: Local CRUD | Not Started | 0 | 0 |
+| Phase 1: Local CRUD | In Progress | 1 | 5 |
 | Phase 1b: Output Formats | Not Started | 0 | 0 |
 | Phase 1c: Configuration | Not Started | 0 | 0 |
 | Phase 1d: Error Handling | Not Started | 0 | 0 |
