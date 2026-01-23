@@ -349,8 +349,8 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: Custom state mapping in config
 
 ### Feature: Linear Claims (`linear_claim.feature`)
-- [ ] Scenario: Claim adds agent label
-- [ ] Scenario: Release removes agent label
+- [x] Scenario: Claim adds agent label
+- [x] Scenario: Release removes agent label
 
 ### Step Definitions - Phase 6
 - [x] Implement mock Linear API for testing
@@ -409,5 +409,5 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 | Phase 3: Git Sync | Complete | 2 | 19 |
 | Phase 4: GitHub Issues | Complete | 6 | 73 |
 | Phase 5: GitHub Projects | Complete | 1 | 7 |
-| Phase 6: Linear | In Progress | 2 | 25 |
+| Phase 6: Linear | Complete | 4 | 50 |
 | Cross-Cutting | Not Started | 0 | 0 |

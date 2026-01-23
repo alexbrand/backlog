@@ -372,6 +372,53 @@ func (m *MockLinearServer) handleUpdateIssue(w http.ResponseWriter, variables ma
 		issue.Assignee = assigneeID
 	}
 
+	// Handle labelIds - replaces all labels
+	if labelIDsRaw, ok := input["labelIds"].([]interface{}); ok {
+		var newLabels []string
+		for _, labelIDRaw := range labelIDsRaw {
+			if labelID, ok := labelIDRaw.(string); ok {
+				// Extract label name from ID (format: "label-{name}")
+				labelName := strings.TrimPrefix(labelID, "label-")
+				newLabels = append(newLabels, labelName)
+			}
+		}
+		issue.Labels = newLabels
+	}
+
+	// Handle addLabelIds - adds labels to existing
+	if addLabelIDsRaw, ok := input["addLabelIds"].([]interface{}); ok {
+		existingLabels := make(map[string]bool)
+		for _, label := range issue.Labels {
+			existingLabels[label] = true
+		}
+		for _, labelIDRaw := range addLabelIDsRaw {
+			if labelID, ok := labelIDRaw.(string); ok {
+				labelName := strings.TrimPrefix(labelID, "label-")
+				if !existingLabels[labelName] {
+					issue.Labels = append(issue.Labels, labelName)
+				}
+			}
+		}
+	}
+
+	// Handle removeLabelIds - removes labels from existing
+	if removeLabelIDsRaw, ok := input["removeLabelIds"].([]interface{}); ok {
+		removeLabels := make(map[string]bool)
+		for _, labelIDRaw := range removeLabelIDsRaw {
+			if labelID, ok := labelIDRaw.(string); ok {
+				labelName := strings.TrimPrefix(labelID, "label-")
+				removeLabels[labelName] = true
+			}
+		}
+		var newLabels []string
+		for _, label := range issue.Labels {
+			if !removeLabels[label] {
+				newLabels = append(newLabels, label)
+			}
+		}
+		issue.Labels = newLabels
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"data": map[string]interface{}{
