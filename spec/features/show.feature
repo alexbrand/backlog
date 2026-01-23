@@ -17,3 +17,19 @@ Feature: Showing Tasks
     And stdout should contain "feature"
     And stdout should contain "auth"
     And stdout should contain "OAuth2 implementation needed"
+
+  Scenario: Show task in JSON format
+    Given a backlog with the following tasks:
+      | id    | title           | status      | priority | assignee | labels        | description                  |
+      | task1 | Implement auth  | in-progress | high     | alex     | feature,auth  | OAuth2 implementation needed |
+    When I run "backlog show task1 -f json"
+    Then the exit code should be 0
+    And the JSON output should be valid
+    And the JSON output should have "id" equal to "task1"
+    And the JSON output should have "title" equal to "Implement auth"
+    And the JSON output should have "status" equal to "in-progress"
+    And the JSON output should have "priority" equal to "high"
+    And the JSON output should have "assignee" equal to "alex"
+    And the JSON output should have "labels" as an array
+    And the JSON output should have array "labels" containing "feature"
+    And the JSON output should have array "labels" containing "auth"

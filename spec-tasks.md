@@ -79,7 +79,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 
 ### Feature: Showing Tasks (`show.feature`)
 - [x] Scenario: Show task displays all fields
-- [ ] Scenario: Show task in JSON format
+- [x] Scenario: Show task in JSON format
 - [ ] Scenario: Show task with comments
 - [ ] Scenario: Show non-existent task returns exit code 3
 - [ ] Scenario: Show task displays correct status directory
