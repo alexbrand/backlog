@@ -279,10 +279,10 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: Move to unmapped status fails
 
 ### Feature: GitHub Claims (`github_claim.feature`)
-- [ ] Scenario: Claim adds agent label to issue
-- [ ] Scenario: Claim assigns issue to authenticated user
-- [ ] Scenario: Release removes agent label and unassigns
-- [ ] Scenario: Claim already-claimed issue returns exit code 2
+- [x] Scenario: Claim adds agent label to issue
+- [x] Scenario: Claim assigns issue to authenticated user
+- [x] Scenario: Release removes agent label and unassigns
+- [x] Scenario: Claim already-claimed issue returns exit code 2
 
 ### Feature: GitHub Comments (`github_comments.feature`)
 - [ ] Scenario: Comment adds issue comment via API
@@ -385,7 +385,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 | Phase 1d: Error Handling | Complete | 1 | 12 |
 | Phase 2: Agent Coordination | Complete | 5 | 46 |
 | Phase 3: Git Sync | Complete | 2 | 19 |
-| Phase 4: GitHub Issues | In Progress | 3 | 35 |
+| Phase 4: GitHub Issues | In Progress | 4 | 53 |
 | Phase 5: GitHub Projects | Not Started | 0 | 0 |
 | Phase 6: Linear | Not Started | 0 | 0 |
 | Cross-Cutting | Not Started | 0 | 0 |
