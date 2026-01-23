@@ -9,7 +9,7 @@ This plan covers implementing a Gherkin-based executable specification using [go
 ## Phase 0: Test Infrastructure Setup
 
 ### Project Setup
-- [ ] Add godog dependency (`go get github.com/cucumber/godog`)
+- [x] Add godog dependency (`go get github.com/cucumber/godog`)
 - [ ] Create `spec/` directory structure
 - [ ] Create `spec/features/` for `.feature` files
 - [ ] Create `spec/steps/` for step definitions
