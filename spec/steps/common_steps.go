@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -108,6 +109,15 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the JSON output should have array "([^"]*)" containing "([^"]*)"$`, theJSONOutputShouldHaveArrayContaining)
 	ctx.Step(`^the JSON output should have array length "([^"]*)" equal to (\d+)$`, theJSONOutputShouldHaveArrayLengthEqualTo)
 	ctx.Step(`^task "([^"]*)" has the following comments:$`, taskHasTheFollowingComments)
+
+	// Task state verification steps
+	ctx.Step(`^the task "([^"]*)" should have status "([^"]*)"$`, theTaskShouldHaveStatus)
+	ctx.Step(`^the task "([^"]*)" should be in directory "([^"]*)"$`, theTaskShouldBeInDirectory)
+	ctx.Step(`^the task "([^"]*)" should have title "([^"]*)"$`, theTaskShouldHaveTitle)
+	ctx.Step(`^the task "([^"]*)" should have priority "([^"]*)"$`, theTaskShouldHavePriority)
+	ctx.Step(`^the task "([^"]*)" should have assignee "([^"]*)"$`, theTaskShouldHaveAssignee)
+	ctx.Step(`^the task "([^"]*)" should have label "([^"]*)"$`, theTaskShouldHaveLabel)
+	ctx.Step(`^the task "([^"]*)" should have comment containing "([^"]*)"$`, theTaskShouldHaveCommentContaining)
 }
 
 // aFreshBacklogDirectory creates a new empty .backlog directory.
@@ -650,4 +660,153 @@ func taskHasTheFollowingComments(ctx context.Context, taskID string, table *godo
 	}
 
 	return ctx, nil
+}
+
+// theTaskShouldHaveStatus verifies a task has the expected status.
+func theTaskShouldHaveStatus(ctx context.Context, taskID, expectedStatus string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	reader := support.NewTaskFileReader(env.Path(".backlog"))
+	task := reader.ReadTask(taskID)
+	if task.ParseErr != nil {
+		return fmt.Errorf("failed to read task %s: %w", taskID, task.ParseErr)
+	}
+
+	if task.Status != expectedStatus {
+		return fmt.Errorf("expected task %s to have status %q, got %q", taskID, expectedStatus, task.Status)
+	}
+
+	return nil
+}
+
+// theTaskShouldBeInDirectory verifies a task file exists in the expected status directory.
+func theTaskShouldBeInDirectory(ctx context.Context, taskID, expectedDir string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	reader := support.NewTaskFileReader(env.Path(".backlog"))
+	task := reader.ReadTask(taskID)
+	if task.ParseErr != nil {
+		return fmt.Errorf("failed to read task %s: %w", taskID, task.ParseErr)
+	}
+
+	// Check the directory from the path
+	dir := filepath.Dir(task.Path)
+	actualDir := filepath.Base(dir)
+	if actualDir != expectedDir {
+		return fmt.Errorf("expected task %s to be in directory %q, got %q", taskID, expectedDir, actualDir)
+	}
+
+	return nil
+}
+
+// theTaskShouldHaveTitle verifies a task has the expected title.
+func theTaskShouldHaveTitle(ctx context.Context, taskID, expectedTitle string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	reader := support.NewTaskFileReader(env.Path(".backlog"))
+	task := reader.ReadTask(taskID)
+	if task.ParseErr != nil {
+		return fmt.Errorf("failed to read task %s: %w", taskID, task.ParseErr)
+	}
+
+	if task.Title != expectedTitle {
+		return fmt.Errorf("expected task %s to have title %q, got %q", taskID, expectedTitle, task.Title)
+	}
+
+	return nil
+}
+
+// theTaskShouldHavePriority verifies a task has the expected priority.
+func theTaskShouldHavePriority(ctx context.Context, taskID, expectedPriority string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	reader := support.NewTaskFileReader(env.Path(".backlog"))
+	task := reader.ReadTask(taskID)
+	if task.ParseErr != nil {
+		return fmt.Errorf("failed to read task %s: %w", taskID, task.ParseErr)
+	}
+
+	if task.Priority != expectedPriority {
+		return fmt.Errorf("expected task %s to have priority %q, got %q", taskID, expectedPriority, task.Priority)
+	}
+
+	return nil
+}
+
+// theTaskShouldHaveAssignee verifies a task has the expected assignee.
+func theTaskShouldHaveAssignee(ctx context.Context, taskID, expectedAssignee string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	reader := support.NewTaskFileReader(env.Path(".backlog"))
+	task := reader.ReadTask(taskID)
+	if task.ParseErr != nil {
+		return fmt.Errorf("failed to read task %s: %w", taskID, task.ParseErr)
+	}
+
+	if task.Assignee != expectedAssignee {
+		return fmt.Errorf("expected task %s to have assignee %q, got %q", taskID, expectedAssignee, task.Assignee)
+	}
+
+	return nil
+}
+
+// theTaskShouldHaveLabel verifies a task has a specific label.
+func theTaskShouldHaveLabel(ctx context.Context, taskID, expectedLabel string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	reader := support.NewTaskFileReader(env.Path(".backlog"))
+	task := reader.ReadTask(taskID)
+	if task.ParseErr != nil {
+		return fmt.Errorf("failed to read task %s: %w", taskID, task.ParseErr)
+	}
+
+	if !task.HasLabel(expectedLabel) {
+		return fmt.Errorf("expected task %s to have label %q, but it has labels: %v", taskID, expectedLabel, task.Labels)
+	}
+
+	return nil
+}
+
+// theTaskShouldHaveCommentContaining verifies a task has a comment containing specific text.
+func theTaskShouldHaveCommentContaining(ctx context.Context, taskID, expectedText string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	reader := support.NewTaskFileReader(env.Path(".backlog"))
+	task := reader.ReadTask(taskID)
+	if task.ParseErr != nil {
+		return fmt.Errorf("failed to read task %s: %w", taskID, task.ParseErr)
+	}
+
+	// Read the full file content to check for comments
+	content, err := os.ReadFile(task.Path)
+	if err != nil {
+		return fmt.Errorf("failed to read task file: %w", err)
+	}
+
+	if !strings.Contains(string(content), expectedText) {
+		return fmt.Errorf("expected task %s to have comment containing %q, but it doesn't.\nFile content:\n%s", taskID, expectedText, string(content))
+	}
+
+	return nil
 }

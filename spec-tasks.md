@@ -85,12 +85,12 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: Show task displays correct status directory
 
 ### Feature: Moving Tasks (`move.feature`)
-- [ ] Scenario Outline: Move task to each valid status
-- [ ] Scenario: Move task updates file location
-- [ ] Scenario: Move task updates frontmatter
-- [ ] Scenario: Move to invalid status fails
-- [ ] Scenario: Move non-existent task returns exit code 3
-- [ ] Scenario: Move task with comment flag
+- [x] Scenario Outline: Move task to each valid status
+- [x] Scenario: Move task updates file location
+- [x] Scenario: Move task updates frontmatter
+- [x] Scenario: Move to invalid status fails
+- [x] Scenario: Move non-existent task returns exit code 3
+- [x] Scenario: Move task with comment flag
 
 ### Feature: Editing Tasks (`edit.feature`)
 - [ ] Scenario: Edit task title
@@ -107,7 +107,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [ ] Implement "Given a task {string} exists with priority {string}"
 - [ ] Implement "Given a task {string} exists with labels {string}"
 - [x] Implement "Then a task file should exist in {string} directory"
-- [ ] Implement "Then the task {string} should have status {string}"
+- [x] Implement "Then the task {string} should have status {string}"
 - [x] Implement "Then the created task should have priority {string}"
 - [x] Implement "Then the created task should have label {string}"
 - [ ] Implement "Then the task {string} should not have label {string}"
@@ -378,7 +378,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 | Phase | Status | Feature Files | Scenarios |
 |-------|--------|---------------|-----------|
 | Phase 0: Infrastructure | Complete | 0 | 0 |
-| Phase 1: Local CRUD | In Progress | 3 | 17 |
+| Phase 1: Local CRUD | In Progress | 4 | 26 |
 | Phase 1b: Output Formats | Not Started | 0 | 0 |
 | Phase 1c: Configuration | Not Started | 0 | 0 |
 | Phase 1d: Error Handling | Not Started | 0 | 0 |
