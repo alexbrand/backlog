@@ -72,6 +72,16 @@ func (f *JSONFormatter) FormatClaimed(w io.Writer, task *backend.Task, agentID s
 	})
 }
 
+// FormatReleased outputs the result of releasing a task as JSON.
+func (f *JSONFormatter) FormatReleased(w io.Writer, task *backend.Task) error {
+	return f.writeJSON(w, map[string]any{
+		"id":     task.ID,
+		"title":  task.Title,
+		"status": task.Status,
+		"url":    task.URL,
+	})
+}
+
 // FormatError outputs an error as JSON.
 func (f *JSONFormatter) FormatError(w io.Writer, code string, message string, details map[string]any) error {
 	errObj := map[string]any{

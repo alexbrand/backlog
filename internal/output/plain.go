@@ -66,6 +66,12 @@ func (f *PlainFormatter) FormatClaimed(w io.Writer, task *backend.Task, agentID 
 	return nil
 }
 
+// FormatReleased outputs the result of releasing a task in plain format.
+func (f *PlainFormatter) FormatReleased(w io.Writer, task *backend.Task) error {
+	fmt.Fprintf(w, "%s\t%s\n", task.ID, task.Status)
+	return nil
+}
+
 // FormatError outputs an error in plain format.
 func (f *PlainFormatter) FormatError(w io.Writer, code string, message string, details map[string]any) error {
 	fmt.Fprintf(w, "error: %s\n", message)

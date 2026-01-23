@@ -58,6 +58,9 @@ type Formatter interface {
 	// FormatClaimed outputs the result of claiming a task.
 	FormatClaimed(w io.Writer, task *backend.Task, agentID string, alreadyOwned bool) error
 
+	// FormatReleased outputs the result of releasing a task.
+	FormatReleased(w io.Writer, task *backend.Task) error
+
 	// FormatError outputs an error.
 	FormatError(w io.Writer, code string, message string, details map[string]any) error
 }

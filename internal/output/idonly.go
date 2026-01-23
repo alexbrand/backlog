@@ -62,6 +62,12 @@ func (f *IDOnlyFormatter) FormatClaimed(w io.Writer, task *backend.Task, _ strin
 	return nil
 }
 
+// FormatReleased outputs only the released task ID.
+func (f *IDOnlyFormatter) FormatReleased(w io.Writer, task *backend.Task) error {
+	fmt.Fprintln(w, task.ID)
+	return nil
+}
+
 // FormatError outputs an error message (errors are always shown).
 func (f *IDOnlyFormatter) FormatError(w io.Writer, code string, message string, details map[string]any) error {
 	fmt.Fprintf(w, "error: %s\n", message)

@@ -80,7 +80,7 @@
 
 ### CLI Commands - Phase 2
 - [x] Implement `backlog claim <id>` — acquire lock, add agent label to frontmatter, move to `in-progress`
-- [ ] Implement `backlog release <id>` — release lock, remove agent label, move to `todo`
+- [x] Implement `backlog release <id>` — release lock, remove agent label, move to `todo`
 - [ ] Implement `backlog next` — find highest priority unclaimed task
 - [ ] Implement `backlog next --claim` — atomic claim
 - [ ] Implement `backlog next --label=<label>` — filtered next

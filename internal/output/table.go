@@ -145,6 +145,12 @@ func (f *TableFormatter) FormatClaimed(w io.Writer, task *backend.Task, agentID 
 	return nil
 }
 
+// FormatReleased outputs the result of releasing a task.
+func (f *TableFormatter) FormatReleased(w io.Writer, task *backend.Task) error {
+	fmt.Fprintf(w, "Released %s: %s\n", task.ID, task.Title)
+	return nil
+}
+
 // FormatError outputs an error message.
 func (f *TableFormatter) FormatError(w io.Writer, code string, message string, details map[string]any) error {
 	fmt.Fprintf(w, "error: %s\n", message)
