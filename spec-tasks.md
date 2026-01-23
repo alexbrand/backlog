@@ -78,7 +78,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 - [x] Scenario: List shows hasMore flag when more tasks exist
 
 ### Feature: Showing Tasks (`show.feature`)
-- [ ] Scenario: Show task displays all fields
+- [x] Scenario: Show task displays all fields
 - [ ] Scenario: Show task in JSON format
 - [ ] Scenario: Show task with comments
 - [ ] Scenario: Show non-existent task returns exit code 3
