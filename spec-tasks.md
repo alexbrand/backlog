@@ -121,10 +121,10 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 ## Phase 1b: Output Format Specs
 
 ### Feature: Table Output (`output_table.feature`)
-- [ ] Scenario: Table output has correct headers
-- [ ] Scenario: Table output aligns columns
-- [ ] Scenario: Table output truncates long titles
-- [ ] Scenario: Table output shows dash for empty fields
+- [x] Scenario: Table output has correct headers
+- [x] Scenario: Table output aligns columns
+- [x] Scenario: Table output truncates long titles
+- [x] Scenario: Table output shows dash for empty fields
 
 ### Feature: JSON Output (`output_json.feature`)
 - [ ] Scenario: JSON output is valid JSON
@@ -380,7 +380,7 @@ Once the spec is in place, it will serve as the foundation for TDD-based impleme
 |-------|--------|---------------|-----------|
 | Phase 0: Infrastructure | Complete | 0 | 0 |
 | Phase 1: Local CRUD | In Progress | 5 | 36 |
-| Phase 1b: Output Formats | Not Started | 0 | 0 |
+| Phase 1b: Output Formats | In Progress | 1 | 4 |
 | Phase 1c: Configuration | Not Started | 0 | 0 |
 | Phase 1d: Error Handling | Not Started | 0 | 0 |
 | Phase 2: Agent Coordination | Not Started | 0 | 0 |
