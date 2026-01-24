@@ -2,14 +2,17 @@ package cli
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/alexbrand/backlog/internal/credentials"
+	"github.com/alexbrand/backlog/internal/github"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -271,6 +274,18 @@ func configureGitHubBackendInit(reader *bufio.Reader, detectedRepo string) map[s
 		fmt.Println("    - Add token to ~/.config/backlog/credentials.yaml")
 	}
 
+	// GitHub Projects setup (if token and repo are available)
+	if token != "" && repo != "" {
+		projectNum, err := configureGitHubProject(reader, token, repo)
+		if err != nil {
+			fmt.Printf("  Warning: %v\n", err)
+			fmt.Println("  Continuing with label-based status tracking...")
+		} else if projectNum > 0 {
+			config["project"] = projectNum
+			config["status_field"] = "Status"
+		}
+	}
+
 	// Optional: Agent ID
 	fmt.Print("  Agent ID (optional, press Enter to skip): ")
 	agentID, _ := reader.ReadString('\n')
@@ -315,4 +330,139 @@ func configureLocalBackendInit(reader *bufio.Reader) map[string]any {
 	}
 
 	return config
+}
+
+// configureGitHubProject handles the GitHub Projects setup during init.
+// Returns the project number to use, or 0 to skip project integration.
+func configureGitHubProject(reader *bufio.Reader, token, repo string) (int, error) {
+	// Parse owner/repo
+	parts := strings.SplitN(repo, "/", 2)
+	if len(parts) != 2 {
+		return 0, fmt.Errorf("invalid repo format: %s", repo)
+	}
+	owner, repoName := parts[0], parts[1]
+
+	ctx := context.Background()
+	apiURL := os.Getenv("GITHUB_API_URL") // For testing
+
+	fmt.Println()
+	fmt.Println("  GitHub Projects:")
+
+	// List existing projects
+	projects, err := github.ListRepositoryProjects(ctx, token, owner, repoName, apiURL)
+	if err != nil {
+		return 0, fmt.Errorf("failed to list projects: %w", err)
+	}
+
+	// Display options based on existing projects
+	if len(projects) > 0 {
+		fmt.Printf("    Found %d project(s):\n", len(projects))
+		for i, p := range projects {
+			fmt.Printf("      %d. %s (#%d)\n", i+1, p.Title, p.Number)
+		}
+		fmt.Println()
+		fmt.Println("    Options:")
+		fmt.Printf("      [1-%d] Select existing project\n", len(projects))
+		fmt.Println("      [c]   Create new project")
+		fmt.Println("      [s]   Skip (use labels for status)")
+		fmt.Println()
+
+		defaultChoice := "1"
+		if len(projects) == 1 {
+			fmt.Printf("    Choose [%d]: ", projects[0].Number)
+			defaultChoice = "1"
+		} else {
+			fmt.Print("    Choose: ")
+			defaultChoice = ""
+		}
+
+		choice, _ := reader.ReadString('\n')
+		choice = strings.TrimSpace(strings.ToLower(choice))
+		if choice == "" {
+			choice = defaultChoice
+		}
+
+		switch choice {
+		case "s", "skip":
+			fmt.Println("    Skipping GitHub Projects integration.")
+			return 0, nil
+		case "c", "create":
+			return createNewProject(reader, ctx, token, owner, repoName, apiURL)
+		default:
+			// Try to parse as number (1-based index)
+			if idx, err := strconv.Atoi(choice); err == nil && idx >= 1 && idx <= len(projects) {
+				selected := projects[idx-1]
+				fmt.Printf("    Selected: %s (#%d)\n", selected.Title, selected.Number)
+				return selected.Number, nil
+			}
+			fmt.Println("    Invalid choice, skipping project setup.")
+			return 0, nil
+		}
+	}
+
+	// No existing projects
+	fmt.Println("    No projects found for this repository.")
+	fmt.Println()
+	fmt.Println("    Options:")
+	fmt.Println("      [c] Create new project (recommended)")
+	fmt.Println("      [s] Skip (use labels for status)")
+	fmt.Print("    Choose [c]: ")
+
+	choice, _ := reader.ReadString('\n')
+	choice = strings.TrimSpace(strings.ToLower(choice))
+	if choice == "" {
+		choice = "c"
+	}
+
+	switch choice {
+	case "s", "skip":
+		fmt.Println("    Skipping GitHub Projects integration.")
+		return 0, nil
+	case "c", "create", "":
+		return createNewProject(reader, ctx, token, owner, repoName, apiURL)
+	default:
+		fmt.Println("    Invalid choice, skipping project setup.")
+		return 0, nil
+	}
+}
+
+// createNewProject creates a new GitHub Project with standard status columns.
+func createNewProject(reader *bufio.Reader, ctx context.Context, token, owner, repo, apiURL string) (int, error) {
+	// Prompt for project name
+	defaultName := fmt.Sprintf("%s/%s Backlog", owner, repo)
+	fmt.Printf("    Project name [%s]: ", defaultName)
+	name, _ := reader.ReadString('\n')
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = defaultName
+	}
+
+	// Get owner ID for project creation
+	fmt.Print("    Creating project...")
+	ownerID, err := github.GetOwnerID(ctx, token, owner, apiURL)
+	if err != nil {
+		fmt.Println(" failed")
+		return 0, fmt.Errorf("failed to get owner ID: %w", err)
+	}
+
+	// Create the project
+	result, err := github.CreateProject(ctx, token, ownerID, name, apiURL)
+	if err != nil {
+		fmt.Println(" failed")
+		return 0, fmt.Errorf("failed to create project: %w", err)
+	}
+
+	fmt.Printf(" created (#%d)\n", result.Number)
+
+	// Configure status options
+	fmt.Print("    Configuring status columns...")
+	if err := github.ConfigureProjectStatus(ctx, token, result.ID, apiURL); err != nil {
+		fmt.Printf(" warning: %v\n", err)
+		// Continue anyway - project was created
+	} else {
+		fmt.Println(" done")
+		fmt.Println("    Columns: Backlog, Todo, In Progress, Review, Done")
+	}
+
+	return result.Number, nil
 }

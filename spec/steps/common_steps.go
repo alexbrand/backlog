@@ -120,6 +120,7 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the directory "([^"]*)" should exist$`, theDirectoryShouldExist)
 	ctx.Step(`^the file "([^"]*)" should exist$`, theFileShouldExist)
 	ctx.Step(`^the file "([^"]*)" should contain "([^"]*)"$`, theFileShouldContain)
+	ctx.Step(`^the file "([^"]*)" should not contain "([^"]*)"$`, theFileShouldNotContain)
 	ctx.Step(`^a task file should exist in "([^"]*)" directory$`, aTaskFileShouldExistInDirectory)
 	ctx.Step(`^the created task should have priority "([^"]*)"$`, theCreatedTaskShouldHavePriority)
 	ctx.Step(`^the created task should have label "([^"]*)"$`, theCreatedTaskShouldHaveLabel)
@@ -216,6 +217,7 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the mock GitHub API has no project with ID (\d+)$`, theMockGitHubAPIHasNoProjectWithID)
 	ctx.Step(`^the project item for issue "([^"]*)" should be in column "([^"]*)"$`, theProjectItemShouldBeInColumn)
 	ctx.Step(`^the issue "([^"]*)" is in project (\d+) column "([^"]*)"$`, theIssueIsInProjectColumn)
+	ctx.Step(`^the mock GitHub API has the following projects:$`, theMockGitHubAPIHasTheFollowingProjects)
 
 	// Mock Linear API steps
 	ctx.Step(`^a mock Linear API server is running$`, aMockLinearAPIServerIsRunning)
@@ -598,6 +600,24 @@ func theFileShouldContain(ctx context.Context, path, expected string) error {
 
 	if !strings.Contains(content, expected) {
 		return fmt.Errorf("file %q does not contain %q\nActual content:\n%s", path, expected, content)
+	}
+
+	return nil
+}
+
+func theFileShouldNotContain(ctx context.Context, path, unexpected string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	content, err := env.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("failed to read file %q: %w", path, err)
+	}
+
+	if strings.Contains(content, unexpected) {
+		return fmt.Errorf("file %q should not contain %q\nActual content:\n%s", path, unexpected, content)
 	}
 
 	return nil
@@ -3196,4 +3216,48 @@ func theLinearIssueShouldHaveLabel(ctx context.Context, issueID, label string) e
 	}
 
 	return fmt.Errorf("issue %q does not have label %q (has: %v)", issueID, label, issue.Labels)
+}
+
+// theMockGitHubAPIHasTheFollowingProjects sets up multiple projects for listing.
+func theMockGitHubAPIHasTheFollowingProjects(ctx context.Context, table *godog.Table) (context.Context, error) {
+	server := getMockGitHubServer(ctx)
+	if server == nil {
+		return ctx, fmt.Errorf("mock GitHub API server not running - call 'a mock GitHub API server is running' first")
+	}
+
+	if len(table.Rows) < 2 {
+		return ctx, fmt.Errorf("table must have at least a header row and one data row")
+	}
+
+	header := table.Rows[0]
+	colIndex := make(map[string]int)
+	for i, cell := range header.Cells {
+		colIndex[cell.Value] = i
+	}
+
+	for _, row := range table.Rows[1:] {
+		getValue := func(col string) string {
+			if idx, ok := colIndex[col]; ok && idx < len(row.Cells) {
+				return row.Cells[idx].Value
+			}
+			return ""
+		}
+
+		numberStr := getValue("number")
+		title := getValue("title")
+
+		var number int
+		fmt.Sscanf(numberStr, "%d", &number)
+		if number <= 0 {
+			return ctx, fmt.Errorf("invalid project number: %s", numberStr)
+		}
+
+		// Create project with default Status column
+		columns := []support.MockGitHubProjectColumn{
+			{ID: "STATUS_1", Name: "Status"},
+		}
+		server.SetProject(number, title, columns)
+	}
+
+	return ctx, nil
 }

@@ -88,6 +88,18 @@ type MockGitHubServer struct {
 
 	// InvalidProjectIDs tracks project IDs that should return errors
 	InvalidProjectIDs map[int]bool
+
+	// NextProjectNumber is the next project number to assign when creating
+	NextProjectNumber int
+
+	// OwnerID is the GraphQL node ID for the repository owner
+	OwnerID string
+
+	// OwnerType is "Organization" or "User"
+	OwnerType string
+
+	// ProjectListError if set, returns this error for list projects queries
+	ProjectListError string
 }
 
 // NewMockGitHubServer creates and starts a new mock GitHub API server.
@@ -101,6 +113,9 @@ func NewMockGitHubServer() *MockGitHubServer {
 		Projects:          make(map[int]*MockGitHubProject),
 		ProjectItems:      make(map[int]map[int]*MockGitHubProjectItem),
 		InvalidProjectIDs: make(map[int]bool),
+		NextProjectNumber: 1,
+		OwnerID:           "O_test123",
+		OwnerType:         "Organization",
 	}
 
 	mux := http.NewServeMux()
@@ -852,6 +867,30 @@ func (m *MockGitHubServer) handleGraphQL(w http.ResponseWriter, r *http.Request)
 			m.handleUpdateProjectItemMutation(w, req.Variables)
 			return
 		}
+		if strings.Contains(query, "createProjectV2") {
+			m.handleCreateProjectMutation(w, req.Variables)
+			return
+		}
+		if strings.Contains(query, "createProjectV2FieldOption") {
+			m.handleCreateFieldOptionMutation(w, req.Variables)
+			return
+		}
+	}
+
+	// Check for owner ID queries (organization or user)
+	if strings.Contains(query, "organization(") && !strings.Contains(query, "projectV2") {
+		m.handleOrganizationQuery(w, req.Variables)
+		return
+	}
+	if strings.Contains(query, "user(") && !strings.Contains(query, "projectV2") {
+		m.handleUserQuery(w, req.Variables)
+		return
+	}
+
+	// Check for list projects query (repository.projectsV2)
+	if strings.Contains(query, "projectsV2") && strings.Contains(query, "repository") {
+		m.handleListProjectsQuery(w, req.Variables)
+		return
 	}
 
 	// Check for issue node ID query (used by GetIssueNodeID)
@@ -1246,6 +1285,180 @@ func (m *MockGitHubServer) handleUpdateProjectItemMutation(w http.ResponseWriter
 			},
 		},
 	})
+}
+
+// handleListProjectsQuery handles the repository.projectsV2 query.
+func (m *MockGitHubServer) handleListProjectsQuery(w http.ResponseWriter, variables map[string]interface{}) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// Check if error is configured
+	if m.ProjectListError != "" {
+		m.writeGraphQLError(w, m.ProjectListError)
+		return
+	}
+
+	// Build list of projects
+	nodes := make([]map[string]interface{}, 0, len(m.Projects))
+	for _, project := range m.Projects {
+		nodes = append(nodes, map[string]interface{}{
+			"id":     fmt.Sprintf("PVT_%d", project.ID),
+			"number": project.ID,
+			"title":  project.Title,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]interface{}{
+			"repository": map[string]interface{}{
+				"projectsV2": map[string]interface{}{
+					"nodes": nodes,
+				},
+			},
+		},
+	})
+}
+
+// handleOrganizationQuery handles the organization(login:) query for getting owner ID.
+func (m *MockGitHubServer) handleOrganizationQuery(w http.ResponseWriter, variables map[string]interface{}) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// If owner type is Organization, return the owner ID
+	if m.OwnerType == "Organization" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"data": map[string]interface{}{
+				"organization": map[string]interface{}{
+					"id": m.OwnerID,
+				},
+			},
+		})
+		return
+	}
+
+	// Return null for organization to trigger user query fallback
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]interface{}{
+			"organization": nil,
+		},
+		"errors": []map[string]interface{}{
+			{"message": "Could not resolve to an Organization"},
+		},
+	})
+}
+
+// handleUserQuery handles the user(login:) query for getting owner ID.
+func (m *MockGitHubServer) handleUserQuery(w http.ResponseWriter, variables map[string]interface{}) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]interface{}{
+			"user": map[string]interface{}{
+				"id": m.OwnerID,
+			},
+		},
+	})
+}
+
+// handleCreateProjectMutation handles the createProjectV2 mutation.
+func (m *MockGitHubServer) handleCreateProjectMutation(w http.ResponseWriter, variables map[string]interface{}) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Extract input from variables
+	input, ok := variables["input"].(map[string]interface{})
+	if !ok {
+		m.writeGraphQLError(w, "Invalid input")
+		return
+	}
+
+	title, _ := input["title"].(string)
+	if title == "" {
+		title = "Untitled Project"
+	}
+
+	// Create the project
+	projectNumber := m.NextProjectNumber
+	m.NextProjectNumber++
+
+	project := &MockGitHubProject{
+		ID:    projectNumber,
+		Title: title,
+		Columns: []MockGitHubProjectColumn{
+			{ID: "STATUS_FIELD_1", Name: "Status"},
+		},
+	}
+	m.Projects[projectNumber] = project
+	m.ProjectItems[projectNumber] = make(map[int]*MockGitHubProjectItem)
+
+	// Return the mutation response
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]interface{}{
+			"createProjectV2": map[string]interface{}{
+				"projectV2": map[string]interface{}{
+					"id":     fmt.Sprintf("PVT_%d", projectNumber),
+					"number": projectNumber,
+					"title":  title,
+				},
+			},
+		},
+	})
+}
+
+// handleCreateFieldOptionMutation handles the createProjectV2FieldOption mutation.
+func (m *MockGitHubServer) handleCreateFieldOptionMutation(w http.ResponseWriter, variables map[string]interface{}) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Extract input from variables
+	input, ok := variables["input"].(map[string]interface{})
+	if !ok {
+		m.writeGraphQLError(w, "Invalid input")
+		return
+	}
+
+	projectID, _ := input["projectId"].(string)
+	name, _ := input["name"].(string)
+	color, _ := input["color"].(string)
+	if color == "" {
+		color = "GRAY"
+	}
+
+	// Extract project number from ID like "PVT_1"
+	var projectNumber int
+	fmt.Sscanf(projectID, "PVT_%d", &projectNumber)
+
+	// Add the option to the project's columns
+	if project, ok := m.Projects[projectNumber]; ok {
+		optionID := fmt.Sprintf("OPT_%s_%d", strings.ToUpper(strings.ReplaceAll(name, " ", "_")), len(project.Columns))
+		project.Columns = append(project.Columns, MockGitHubProjectColumn{
+			ID:   optionID,
+			Name: name,
+		})
+
+		// Return the mutation response
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"data": map[string]interface{}{
+				"createProjectV2FieldOption": map[string]interface{}{
+					"projectV2SingleSelectFieldOption": map[string]interface{}{
+						"id":    optionID,
+						"name":  name,
+						"color": color,
+					},
+				},
+			},
+		})
+		return
+	}
+
+	m.writeGraphQLError(w, "Project not found")
 }
 
 // writeGraphQLError writes a GraphQL-style error response.

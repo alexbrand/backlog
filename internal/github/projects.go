@@ -592,3 +592,269 @@ func (p *ProjectsClient) MapOptionToStatus(optionName string) backend.Status {
 		return backend.StatusBacklog
 	}
 }
+
+// ============================================================================
+// Standalone functions for project setup (used during init, before ProjectsClient exists)
+// ============================================================================
+
+// ProjectInfo represents basic project information for listing.
+type ProjectInfo struct {
+	ID     string
+	Number int
+	Title  string
+}
+
+// CreateProjectResult contains the result of creating a new project.
+type CreateProjectResult struct {
+	ID     string
+	Number int
+	Title  string
+}
+
+// StatusOption represents a status field option to create.
+type StatusOption struct {
+	Name  string
+	Color string // GRAY, BLUE, GREEN, YELLOW, ORANGE, RED, PURPLE, PINK
+}
+
+// DefaultStatusOptions returns the standard status options for a backlog project.
+func DefaultStatusOptions() []StatusOption {
+	return []StatusOption{
+		{Name: "Backlog", Color: "GRAY"},
+		{Name: "Todo", Color: "BLUE"},
+		{Name: "In Progress", Color: "YELLOW"},
+		{Name: "Review", Color: "ORANGE"},
+		{Name: "Done", Color: "GREEN"},
+	}
+}
+
+// newGraphQLClient creates a new GraphQL client for standalone operations.
+func newGraphQLClient(ctx context.Context, token, apiURL string) *githubv4.Client {
+	src := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
+	httpClient := oauth2.NewClient(ctx, src)
+
+	if apiURL != "" {
+		graphqlURL := apiURL
+		if !strings.HasSuffix(graphqlURL, "/") {
+			graphqlURL += "/"
+		}
+		graphqlURL += "graphql"
+		return githubv4.NewEnterpriseClient(graphqlURL, httpClient)
+	}
+	return githubv4.NewClient(httpClient)
+}
+
+// ListRepositoryProjects returns all GitHub Projects v2 associated with a repository.
+func ListRepositoryProjects(ctx context.Context, token, owner, repo, apiURL string) ([]ProjectInfo, error) {
+	client := newGraphQLClient(ctx, token, apiURL)
+
+	var query struct {
+		Repository struct {
+			ProjectsV2 struct {
+				Nodes []struct {
+					ID     githubv4.ID
+					Number githubv4.Int
+					Title  githubv4.String
+				}
+			} `graphql:"projectsV2(first: 100)"`
+		} `graphql:"repository(owner: $owner, name: $repo)"`
+	}
+
+	variables := map[string]any{
+		"owner": githubv4.String(owner),
+		"repo":  githubv4.String(repo),
+	}
+
+	if err := client.Query(ctx, &query, variables); err != nil {
+		return nil, fmt.Errorf("failed to list projects: %w", err)
+	}
+
+	projects := make([]ProjectInfo, len(query.Repository.ProjectsV2.Nodes))
+	for i, node := range query.Repository.ProjectsV2.Nodes {
+		projects[i] = ProjectInfo{
+			ID:     string(node.ID.(string)),
+			Number: int(node.Number),
+			Title:  string(node.Title),
+		}
+	}
+
+	return projects, nil
+}
+
+// GetOwnerID returns the GraphQL node ID for a repository owner (user or organization).
+func GetOwnerID(ctx context.Context, token, owner, apiURL string) (string, error) {
+	client := newGraphQLClient(ctx, token, apiURL)
+
+	// Try as organization first
+	var orgQuery struct {
+		Organization struct {
+			ID githubv4.ID
+		} `graphql:"organization(login: $login)"`
+	}
+
+	variables := map[string]any{
+		"login": githubv4.String(owner),
+	}
+
+	if err := client.Query(ctx, &orgQuery, variables); err == nil {
+		if orgQuery.Organization.ID != nil {
+			return string(orgQuery.Organization.ID.(string)), nil
+		}
+	}
+
+	// Fall back to user
+	var userQuery struct {
+		User struct {
+			ID githubv4.ID
+		} `graphql:"user(login: $login)"`
+	}
+
+	if err := client.Query(ctx, &userQuery, variables); err != nil {
+		return "", fmt.Errorf("failed to get owner ID for %q: %w", owner, err)
+	}
+
+	if userQuery.User.ID == nil {
+		return "", fmt.Errorf("owner %q not found", owner)
+	}
+
+	return string(userQuery.User.ID.(string)), nil
+}
+
+// CreateProject creates a new GitHub Project v2 for the given owner.
+func CreateProject(ctx context.Context, token, ownerID, title, apiURL string) (*CreateProjectResult, error) {
+	client := newGraphQLClient(ctx, token, apiURL)
+
+	var mutation struct {
+		CreateProjectV2 struct {
+			ProjectV2 struct {
+				ID     githubv4.ID
+				Number githubv4.Int
+				Title  githubv4.String
+			}
+		} `graphql:"createProjectV2(input: $input)"`
+	}
+
+	input := githubv4.CreateProjectV2Input{
+		OwnerID: githubv4.ID(ownerID),
+		Title:   githubv4.String(title),
+	}
+
+	if err := client.Mutate(ctx, &mutation, input, nil); err != nil {
+		return nil, fmt.Errorf("failed to create project: %w", err)
+	}
+
+	return &CreateProjectResult{
+		ID:     string(mutation.CreateProjectV2.ProjectV2.ID.(string)),
+		Number: int(mutation.CreateProjectV2.ProjectV2.Number),
+		Title:  string(mutation.CreateProjectV2.ProjectV2.Title),
+	}, nil
+}
+
+// GetProjectStatusField returns the Status field ID and existing options for a project.
+func GetProjectStatusField(ctx context.Context, token, projectID, apiURL string) (fieldID string, options []ProjectFieldValue, err error) {
+	client := newGraphQLClient(ctx, token, apiURL)
+
+	var query struct {
+		Node struct {
+			ProjectV2 struct {
+				Fields struct {
+					Nodes []struct {
+						ProjectV2SingleSelectField struct {
+							ID      githubv4.ID
+							Name    githubv4.String
+							Options []struct {
+								ID   githubv4.ID
+								Name githubv4.String
+							}
+						} `graphql:"... on ProjectV2SingleSelectField"`
+					}
+				} `graphql:"fields(first: 50)"`
+			} `graphql:"... on ProjectV2"`
+		} `graphql:"node(id: $projectId)"`
+	}
+
+	variables := map[string]any{
+		"projectId": githubv4.ID(projectID),
+	}
+
+	if err := client.Query(ctx, &query, variables); err != nil {
+		return "", nil, fmt.Errorf("failed to get project fields: %w", err)
+	}
+
+	// Find the Status field
+	for _, field := range query.Node.ProjectV2.Fields.Nodes {
+		if string(field.ProjectV2SingleSelectField.Name) == "Status" {
+			fieldID = string(field.ProjectV2SingleSelectField.ID.(string))
+			for _, opt := range field.ProjectV2SingleSelectField.Options {
+				options = append(options, ProjectFieldValue{
+					ID:   string(opt.ID.(string)),
+					Name: string(opt.Name),
+				})
+			}
+			return fieldID, options, nil
+		}
+	}
+
+	return "", nil, errors.New("Status field not found in project")
+}
+
+// AddStatusOption adds a single status option to the project's Status field.
+func AddStatusOption(ctx context.Context, token, projectID, fieldID, apiURL string, option StatusOption) error {
+	client := newGraphQLClient(ctx, token, apiURL)
+
+	var mutation struct {
+		UpdateProjectV2Field struct {
+			ProjectV2Field struct {
+				ID githubv4.ID
+			} `graphql:"... on ProjectV2SingleSelectField"`
+		} `graphql:"createProjectV2FieldOption(input: $input)"`
+	}
+
+	// Note: The actual mutation name is createProjectV2FieldOption, not updateProjectV2Field
+	// We need to use the correct input type
+	type CreateProjectV2FieldOptionInput struct {
+		ProjectID githubv4.ID     `json:"projectId"`
+		FieldID   githubv4.ID     `json:"fieldId"`
+		Name      githubv4.String `json:"name"`
+		Color     githubv4.String `json:"color"`
+	}
+
+	input := CreateProjectV2FieldOptionInput{
+		ProjectID: githubv4.ID(projectID),
+		FieldID:   githubv4.ID(fieldID),
+		Name:      githubv4.String(option.Name),
+		Color:     githubv4.String(option.Color),
+	}
+
+	if err := client.Mutate(ctx, &mutation, input, nil); err != nil {
+		return fmt.Errorf("failed to add status option %q: %w", option.Name, err)
+	}
+
+	return nil
+}
+
+// ConfigureProjectStatus configures the Status field with standard options.
+// It checks which options already exist and only adds missing ones.
+func ConfigureProjectStatus(ctx context.Context, token, projectID, apiURL string) error {
+	fieldID, existingOptions, err := GetProjectStatusField(ctx, token, projectID, apiURL)
+	if err != nil {
+		return err
+	}
+
+	// Build map of existing options
+	existing := make(map[string]bool)
+	for _, opt := range existingOptions {
+		existing[opt.Name] = true
+	}
+
+	// Add missing options
+	for _, opt := range DefaultStatusOptions() {
+		if !existing[opt.Name] {
+			if err := AddStatusOption(ctx, token, projectID, fieldID, apiURL, opt); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
