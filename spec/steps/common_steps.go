@@ -99,11 +99,13 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^a task "([^"]*)" exists with priority "([^"]*)"$`, aTaskExistsWithPriority)
 	ctx.Step(`^a task "([^"]*)" exists with labels "([^"]*)"$`, aTaskExistsWithLabels)
 	ctx.Step(`^the environment variable "([^"]*)" is "([^"]*)"$`, theEnvironmentVariableIs)
+	ctx.Step(`^HOME is set to the test directory$`, homeIsSetToTheTestDirectory)
 	ctx.Step(`^task "([^"]*)" is claimed by agent "([^"]*)"$`, taskIsClaimedByAgent)
 	ctx.Step(`^the agent ID is "([^"]*)"$`, theAgentIDIs)
 
 	// When steps
 	ctx.Step(`^I run "([^"]*)"$`, iRun)
+	ctx.Step(`^I run "([^"]*)" with input:$`, iRunWithInput)
 
 	// Then steps
 	ctx.Step(`^the exit code should be (\d+)$`, theExitCodeShouldBe)
@@ -116,6 +118,7 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the JSON output should have "([^"]*)" equal to "([^"]*)"$`, theJSONOutputShouldHaveEqualTo)
 	ctx.Step(`^the directory "([^"]*)" should exist$`, theDirectoryShouldExist)
 	ctx.Step(`^the file "([^"]*)" should exist$`, theFileShouldExist)
+	ctx.Step(`^the file "([^"]*)" should contain "([^"]*)"$`, theFileShouldContain)
 	ctx.Step(`^a task file should exist in "([^"]*)" directory$`, aTaskFileShouldExistInDirectory)
 	ctx.Step(`^the created task should have priority "([^"]*)"$`, theCreatedTaskShouldHavePriority)
 	ctx.Step(`^the created task should have label "([^"]*)"$`, theCreatedTaskShouldHaveLabel)
@@ -354,6 +357,19 @@ func iRun(ctx context.Context, command string) (context.Context, error) {
 	return ctx, nil
 }
 
+// iRunWithInput executes a CLI command with stdin input.
+func iRunWithInput(ctx context.Context, command string, input *godog.DocString) (context.Context, error) {
+	runner := getCLIRunner(ctx)
+	if runner == nil {
+		return ctx, fmt.Errorf("CLI runner not initialized")
+	}
+
+	result := runner.RunWithInput(input.Content, command)
+	ctx = context.WithValue(ctx, lastResultKey, result)
+
+	return ctx, nil
+}
+
 // theExitCodeShouldBe verifies the exit code of the last command.
 func theExitCodeShouldBe(ctx context.Context, expected int) error {
 	result := getLastResult(ctx)
@@ -538,6 +554,25 @@ func theFileShouldExist(ctx context.Context, path string) error {
 
 	if info.IsDir() {
 		return fmt.Errorf("path %q exists but is a directory, not a file", path)
+	}
+
+	return nil
+}
+
+// theFileShouldContain verifies that a file contains a substring.
+func theFileShouldContain(ctx context.Context, path, expected string) error {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return fmt.Errorf("test environment not initialized")
+	}
+
+	content, err := env.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("failed to read file %q: %w", path, err)
+	}
+
+	if !strings.Contains(content, expected) {
+		return fmt.Errorf("file %q does not contain %q\nActual content:\n%s", path, expected, content)
 	}
 
 	return nil
@@ -1239,6 +1274,18 @@ func theEnvironmentVariableIs(ctx context.Context, key, value string) (context.C
 	}
 
 	env.SetEnv(key, value)
+	return ctx, nil
+}
+
+// homeIsSetToTheTestDirectory sets HOME to the test temp directory.
+// This redirects where config init writes the global config file.
+func homeIsSetToTheTestDirectory(ctx context.Context) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	env.SetEnv("HOME", env.TempDir)
 	return ctx, nil
 }
 

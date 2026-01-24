@@ -61,11 +61,32 @@ func (r *CLIRunner) Run(commandStr string) *CommandResult {
 // RunArgs executes a command with explicit arguments and captures the result.
 // Example: RunArgs("list", "--status=todo", "-f", "json")
 func (r *CLIRunner) RunArgs(args ...string) *CommandResult {
+	return r.RunArgsWithInput("", args...)
+}
+
+// RunWithInput executes a command string with stdin input and captures the result.
+// Example: RunWithInput("main\n1\nowner/repo\n", "backlog config init")
+func (r *CLIRunner) RunWithInput(input string, commandStr string) *CommandResult {
+	args := parseArgs(commandStr)
+	// Strip "backlog" prefix if present since the binary is already named "backlog"
+	if len(args) > 0 && args[0] == "backlog" {
+		args = args[1:]
+	}
+	return r.RunArgsWithInput(input, args...)
+}
+
+// RunArgsWithInput executes a command with explicit arguments and stdin input.
+// Example: RunArgsWithInput("y\n", "config", "init")
+func (r *CLIRunner) RunArgsWithInput(input string, args ...string) *CommandResult {
 	cmd := exec.Command(r.BinaryPath, args...)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+
+	if input != "" {
+		cmd.Stdin = strings.NewReader(input)
+	}
 
 	if r.WorkDir != "" {
 		cmd.Dir = r.WorkDir

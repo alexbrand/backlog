@@ -171,10 +171,14 @@ func runConfigInit() error {
 		},
 	}
 
-	// Get config directory path
-	configPath, err := config.DefaultConfigPath()
-	if err != nil {
-		return WrapExitCodeError(ExitConfigError, "failed to determine config path", err)
+	// Determine config path - prefer project-local if it exists
+	configPath := ".backlog/config.yaml"
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		// No project-local config, use global config
+		configPath, err = config.DefaultConfigPath()
+		if err != nil {
+			return WrapExitCodeError(ExitConfigError, "failed to determine config path", err)
+		}
 	}
 
 	// Create config directory if it doesn't exist
