@@ -9,7 +9,7 @@ on:
 
 jobs:
   spec:
-    name: Run Gherkin Specs
+    name: Run All Specs
     runs-on: ubuntu-latest
 
     steps:
@@ -25,67 +25,10 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
-      - name: Run specs
-        run: make spec
+      - name: Build binary
+        run: make build
 
-  spec-github:
-    name: Run GitHub Backend Specs
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Download dependencies
-        run: go mod download
-
-      - name: Run GitHub specs
-        run: make spec-github
-
-  spec-linear:
-    name: Run Linear Backend Specs
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Download dependencies
-        run: go mod download
-
-      - name: Run Linear specs
-        run: make spec-linear
-
-  coverage:
-    name: Generate Coverage Report
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Download dependencies
-        run: go mod download
-
-      - name: Run specs with coverage
+      - name: Run all specs with coverage
         run: make spec-coverage
 
       - name: Upload coverage report
