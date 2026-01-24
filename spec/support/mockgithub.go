@@ -842,6 +842,18 @@ func (m *MockGitHubServer) handleGraphQL(w http.ResponseWriter, r *http.Request)
 	// Parse and handle different GraphQL queries/mutations
 	query := strings.TrimSpace(req.Query)
 
+	// Check for mutations first
+	if strings.Contains(query, "mutation") {
+		if strings.Contains(query, "addProjectV2ItemById") {
+			m.handleAddProjectItemMutation(w, req.Variables)
+			return
+		}
+		if strings.Contains(query, "updateProjectV2ItemFieldValue") {
+			m.handleUpdateProjectItemMutation(w, req.Variables)
+			return
+		}
+	}
+
 	// Check for issue node ID query (used by GetIssueNodeID)
 	if strings.Contains(query, "repository") && strings.Contains(query, "issue") && !strings.Contains(query, "projectV2") {
 		m.handleIssueNodeIDQuery(w, req.Variables)
@@ -1086,6 +1098,106 @@ func (m *MockGitHubServer) handleIssueNodeIDQuery(w http.ResponseWriter, variabl
 			"repository": map[string]interface{}{
 				"issue": map[string]interface{}{
 					"id": fmt.Sprintf("I_%d", issue.Number),
+				},
+			},
+		},
+	})
+}
+
+// handleAddProjectItemMutation handles the addProjectV2ItemById mutation.
+func (m *MockGitHubServer) handleAddProjectItemMutation(w http.ResponseWriter, variables map[string]interface{}) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Extract input from variables
+	input, ok := variables["input"].(map[string]interface{})
+	if !ok {
+		m.writeGraphQLError(w, "Invalid input")
+		return
+	}
+
+	projectID := input["projectId"].(string)
+	contentID := input["contentId"].(string)
+
+	// Extract project number from ID like "PVT_1"
+	var projectNumber int
+	fmt.Sscanf(projectID, "PVT_%d", &projectNumber)
+
+	// Extract issue number from ID like "I_1"
+	var issueNumber int
+	fmt.Sscanf(contentID, "I_%d", &issueNumber)
+
+	// Create a new project item
+	itemID := fmt.Sprintf("PVTI_%d", issueNumber)
+
+	// Add to project items if not already there
+	if m.ProjectItems[projectNumber] == nil {
+		m.ProjectItems[projectNumber] = make(map[int]*MockGitHubProjectItem)
+	}
+
+	project := m.Projects[projectNumber]
+	defaultColumnID := ""
+	if project != nil && len(project.Columns) > 0 {
+		defaultColumnID = project.Columns[0].ID
+	}
+
+	m.ProjectItems[projectNumber][issueNumber] = &MockGitHubProjectItem{
+		IssueNumber: issueNumber,
+		ColumnID:    defaultColumnID,
+	}
+
+	// Return the mutation response
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]interface{}{
+			"addProjectV2ItemById": map[string]interface{}{
+				"item": map[string]interface{}{
+					"id": itemID,
+				},
+			},
+		},
+	})
+}
+
+// handleUpdateProjectItemMutation handles the updateProjectV2ItemFieldValue mutation.
+func (m *MockGitHubServer) handleUpdateProjectItemMutation(w http.ResponseWriter, variables map[string]interface{}) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Extract input from variables
+	input, ok := variables["input"].(map[string]interface{})
+	if !ok {
+		m.writeGraphQLError(w, "Invalid input")
+		return
+	}
+
+	projectID := input["projectId"].(string)
+	itemID := input["itemId"].(string)
+	value := input["value"].(map[string]interface{})
+	optionID := value["singleSelectOptionId"].(string)
+
+	// Extract project number from ID like "PVT_1"
+	var projectNumber int
+	fmt.Sscanf(projectID, "PVT_%d", &projectNumber)
+
+	// Extract issue number from item ID like "PVTI_1"
+	var issueNumber int
+	fmt.Sscanf(itemID, "PVTI_%d", &issueNumber)
+
+	// Update the project item's column
+	if items, ok := m.ProjectItems[projectNumber]; ok {
+		if item, ok := items[issueNumber]; ok {
+			item.ColumnID = optionID
+		}
+	}
+
+	// Return the mutation response
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]interface{}{
+			"updateProjectV2ItemFieldValue": map[string]interface{}{
+				"projectV2Item": map[string]interface{}{
+					"id": itemID,
 				},
 			},
 		},
