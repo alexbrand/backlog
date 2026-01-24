@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -368,8 +369,16 @@ func (m *MockGitHubServer) listIssues(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Collect and sort issue numbers for deterministic ordering
+	var issueNumbers []int
+	for num := range m.Issues {
+		issueNumbers = append(issueNumbers, num)
+	}
+	sort.Ints(issueNumbers)
+
 	var issues []map[string]interface{}
-	for _, issue := range m.Issues {
+	for _, num := range issueNumbers {
+		issue := m.Issues[num]
 		// Filter by state
 		if state != "all" && issue.State != state {
 			continue
