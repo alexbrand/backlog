@@ -4,9 +4,12 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
+	"github.com/alexbrand/backlog/internal/credentials"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -18,6 +21,10 @@ var initCmd = &cobra.Command{
 
 This command creates the .backlog/ directory structure and guides you through
 configuring the backend (GitHub Issues or local filesystem).
+
+For GitHub backend, it will attempt to auto-detect:
+  - Repository from git remote
+  - Authentication from gh CLI or GITHUB_TOKEN
 
 Created structure:
   .backlog/           - Root backlog directory
@@ -50,6 +57,14 @@ func runInit() error {
 	fmt.Println("Initializing backlog...")
 	fmt.Println()
 
+	// Detect if we're in a git repo with a GitHub remote
+	detectedRepo := detectGitHubRepo()
+	defaultBackend := "1"
+	if detectedRepo != "" {
+		fmt.Printf("Detected GitHub repository: %s\n", detectedRepo)
+		fmt.Println()
+	}
+
 	// Choose backend
 	fmt.Println("Backend:")
 	fmt.Println("  1. GitHub Issues (sync with GitHub)")
@@ -57,14 +72,17 @@ func runInit() error {
 	fmt.Print("Choose [1]: ")
 	backendChoice, _ := reader.ReadString('\n')
 	backendChoice = strings.TrimSpace(backendChoice)
+	if backendChoice == "" {
+		backendChoice = defaultBackend
+	}
 
 	var backendType string
 	var workspaceConfig map[string]any
 
 	switch backendChoice {
-	case "", "1", "github":
+	case "1", "github":
 		backendType = "github"
-		workspaceConfig = configureGitHubBackendInit(reader)
+		workspaceConfig = configureGitHubBackendInit(reader, detectedRepo)
 	case "2", "local":
 		backendType = "local"
 		workspaceConfig = configureLocalBackendInit(reader)
@@ -133,25 +151,124 @@ func runInit() error {
 	return nil
 }
 
-func configureGitHubBackendInit(reader *bufio.Reader) map[string]any {
+// detectGitHubRepo attempts to detect the GitHub repository from git remote.
+// Returns "owner/repo" format or empty string if not detected.
+func detectGitHubRepo() string {
+	// Try to get the origin remote URL
+	cmd := exec.Command("git", "config", "--get", "remote.origin.url")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+
+	url := strings.TrimSpace(string(output))
+	return parseGitHubRepoFromURL(url)
+}
+
+// parseGitHubRepoFromURL extracts owner/repo from various GitHub URL formats.
+func parseGitHubRepoFromURL(url string) string {
+	// Handle SSH format: git@github.com:owner/repo.git
+	sshPattern := regexp.MustCompile(`git@github\.com:([^/]+)/([^/]+?)(?:\.git)?$`)
+	if matches := sshPattern.FindStringSubmatch(url); len(matches) == 3 {
+		return matches[1] + "/" + matches[2]
+	}
+
+	// Handle HTTPS format: https://github.com/owner/repo.git
+	httpsPattern := regexp.MustCompile(`https://github\.com/([^/]+)/([^/]+?)(?:\.git)?$`)
+	if matches := httpsPattern.FindStringSubmatch(url); len(matches) == 3 {
+		return matches[1] + "/" + matches[2]
+	}
+
+	return ""
+}
+
+// detectGitHubToken checks for GitHub token from various sources.
+// Returns the token and a description of where it was found.
+func detectGitHubToken() (token string, source string) {
+	// 1. Check GITHUB_TOKEN environment variable
+	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+		return token, "GITHUB_TOKEN environment variable"
+	}
+
+	// 2. Check credentials file
+	if err := credentials.Init(); err == nil {
+		if token, err := credentials.GetGitHubToken(); err == nil {
+			return token, "credentials file"
+		}
+	}
+
+	// 3. Try gh CLI
+	if token := getGhCliToken(); token != "" {
+		return token, "gh CLI"
+	}
+
+	return "", ""
+}
+
+// getGhCliToken attempts to get a GitHub token from the gh CLI.
+func getGhCliToken() string {
+	cmd := exec.Command("gh", "auth", "token")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
+}
+
+// isGhCliAuthenticated checks if gh CLI is installed and authenticated.
+func isGhCliAuthenticated() bool {
+	cmd := exec.Command("gh", "auth", "status")
+	err := cmd.Run()
+	return err == nil
+}
+
+func configureGitHubBackendInit(reader *bufio.Reader, detectedRepo string) map[string]any {
 	config := make(map[string]any)
 
 	fmt.Println()
 	fmt.Println("GitHub Backend Setup:")
 
-	// Get repository
-	fmt.Print("  Repository (owner/repo): ")
+	// Repository - use detected value as default
+	if detectedRepo != "" {
+		fmt.Printf("  Repository [%s]: ", detectedRepo)
+	} else {
+		fmt.Print("  Repository (owner/repo): ")
+	}
 	repo, _ := reader.ReadString('\n')
 	repo = strings.TrimSpace(repo)
+	if repo == "" && detectedRepo != "" {
+		repo = detectedRepo
+	}
 	if repo != "" {
 		config["repo"] = repo
 	}
 
 	// Check for GitHub token
-	if os.Getenv("GITHUB_TOKEN") == "" {
+	token, tokenSource := detectGitHubToken()
+	if token != "" {
+		fmt.Printf("  Token: Found via %s\n", tokenSource)
+
+		// If token came from gh CLI, offer to save it to credentials file
+		if tokenSource == "gh CLI" {
+			fmt.Print("  Save token to credentials file for faster access? [Y/n]: ")
+			saveChoice, _ := reader.ReadString('\n')
+			saveChoice = strings.TrimSpace(strings.ToLower(saveChoice))
+			if saveChoice == "" || saveChoice == "y" || saveChoice == "yes" {
+				if err := credentials.SaveGitHubToken(token); err != nil {
+					fmt.Printf("  Warning: failed to save token: %v\n", err)
+				} else {
+					credPath, _ := credentials.DefaultCredentialsPath()
+					fmt.Printf("  Token saved to %s\n", credPath)
+				}
+			}
+		}
+	} else {
 		fmt.Println()
-		fmt.Println("  Note: Set GITHUB_TOKEN environment variable or add token to")
-		fmt.Println("  ~/.config/backlog/credentials.yaml")
+		fmt.Println("  No GitHub token found.")
+		fmt.Println("  Options:")
+		fmt.Println("    - Run 'gh auth login' to authenticate with GitHub CLI")
+		fmt.Println("    - Set GITHUB_TOKEN environment variable")
+		fmt.Println("    - Add token to ~/.config/backlog/credentials.yaml")
 	}
 
 	// Optional: Agent ID

@@ -95,6 +95,7 @@ func InitializeCommonSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^a fresh backlog directory$`, aFreshBacklogDirectory)
 	ctx.Step(`^a backlog with the following tasks:$`, aBacklogWithTheFollowingTasks)
 	ctx.Step(`^a file "([^"]*)" with content "([^"]*)"$`, aFileWithContent)
+	ctx.Step(`^a git repository with remote "([^"]*)"$`, aGitRepositoryWithRemote)
 	ctx.Step(`^a task "([^"]*)" exists with status "([^"]*)"$`, aTaskExistsWithStatus)
 	ctx.Step(`^a task "([^"]*)" exists with priority "([^"]*)"$`, aTaskExistsWithPriority)
 	ctx.Step(`^a task "([^"]*)" exists with labels "([^"]*)"$`, aTaskExistsWithLabels)
@@ -508,6 +509,30 @@ func aFileWithContent(ctx context.Context, path, content string) (context.Contex
 
 	if err := env.CreateFile(path, content); err != nil {
 		return ctx, fmt.Errorf("failed to create file %q: %w", path, err)
+	}
+
+	return ctx, nil
+}
+
+// aGitRepositoryWithRemote initializes a git repository with the specified remote URL.
+func aGitRepositoryWithRemote(ctx context.Context, remoteURL string) (context.Context, error) {
+	env := getTestEnv(ctx)
+	if env == nil {
+		return ctx, fmt.Errorf("test environment not initialized")
+	}
+
+	// Initialize git repo
+	cmd := exec.Command("git", "init")
+	cmd.Dir = env.TempDir
+	if err := cmd.Run(); err != nil {
+		return ctx, fmt.Errorf("failed to init git repo: %w", err)
+	}
+
+	// Add remote
+	cmd = exec.Command("git", "remote", "add", "origin", remoteURL)
+	cmd.Dir = env.TempDir
+	if err := cmd.Run(); err != nil {
+		return ctx, fmt.Errorf("failed to add remote: %w", err)
 	}
 
 	return ctx, nil

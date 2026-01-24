@@ -95,3 +95,16 @@ Feature: Initialization
       """
     Then the exit code should be 0
     And the file ".backlog/config.yaml" should contain "agent_id: my-agent"
+
+  Scenario: Initialize GitHub backend with auto-detected repo
+    Given a git repository with remote "git@github.com:testowner/testrepo.git"
+    When I run "backlog init" with input:
+      """
+      1
+
+
+      """
+    Then the exit code should be 0
+    And stdout should contain "Detected GitHub repository: testowner/testrepo"
+    And the file ".backlog/config.yaml" should contain "backend: github"
+    And the file ".backlog/config.yaml" should contain "repo: testowner/testrepo"
