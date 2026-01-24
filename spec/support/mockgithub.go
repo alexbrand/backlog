@@ -915,6 +915,9 @@ func (m *MockGitHubServer) handleProjectQuery(w http.ResponseWriter, query strin
 		}
 	}
 
+	// Check if this is a node(id:) query pattern (used by GetProjectItemByIssue)
+	isNodeQuery := strings.Contains(query, "node(")
+
 	// Build response based on query type
 	if strings.Contains(query, "field") || strings.Contains(query, "Field") {
 		// Query for project fields (columns)
@@ -924,7 +927,7 @@ func (m *MockGitHubServer) handleProjectQuery(w http.ResponseWriter, query strin
 
 	if strings.Contains(query, "items") {
 		// Query for project items
-		m.handleProjectItemsQuery(w, projectNumber, project)
+		m.handleProjectItemsQuery(w, projectNumber, project, isNodeQuery)
 		return
 	}
 
@@ -965,9 +968,7 @@ func (m *MockGitHubServer) handleProjectFieldsQuery(w http.ResponseWriter, proje
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"data": map[string]interface{}{
-				"repository": map[string]interface{}{
-					"projectV2": nil,
-				},
+				"node": nil,
 			},
 		})
 		return
@@ -983,11 +984,10 @@ func (m *MockGitHubServer) handleProjectFieldsQuery(w http.ResponseWriter, proje
 	}
 
 	// Build the fields array with Status as a single-select field
-	// Note: githubv4 uses inline fragments, each field will be unmarshaled
-	// into the appropriate struct based on what fields are present
+	// The shurcooL graphql library matches fields by name, so we include
+	// all the fields that the struct expects
 	fieldNodes := []map[string]interface{}{
 		{
-			// Status field (single-select) - only include fields the query expects
 			"id":      "PVTSSF_Status",
 			"name":    "Status",
 			"options": options,
@@ -1007,23 +1007,39 @@ func (m *MockGitHubServer) handleProjectFieldsQuery(w http.ResponseWriter, proje
 }
 
 // handleProjectItemsQuery returns project items (issues on the board).
-func (m *MockGitHubServer) handleProjectItemsQuery(w http.ResponseWriter, projectID int, project *MockGitHubProject) {
+func (m *MockGitHubServer) handleProjectItemsQuery(w http.ResponseWriter, projectID int, project *MockGitHubProject, isNodeQuery bool) {
 	if project == nil {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"data": map[string]interface{}{
-				"repository": map[string]interface{}{
-					"projectV2": nil,
+		if isNodeQuery {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"data": map[string]interface{}{
+					"node": nil,
 				},
-			},
-		})
+			})
+		} else {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"data": map[string]interface{}{
+					"repository": map[string]interface{}{
+						"projectV2": nil,
+					},
+				},
+			})
+		}
 		return
 	}
 
 	// Build items list
 	var items []map[string]interface{}
 	if projectItems, ok := m.ProjectItems[projectID]; ok {
-		for _, item := range projectItems {
+		// Collect and sort issue numbers for deterministic ordering
+		var issueNumbers []int
+		for issueNum := range projectItems {
+			issueNumbers = append(issueNumbers, issueNum)
+		}
+		sort.Ints(issueNumbers)
+
+		for _, issueNum := range issueNumbers {
+			item := projectItems[issueNum]
 			issue := m.Issues[item.IssueNumber]
 			if issue == nil {
 				continue
@@ -1038,6 +1054,21 @@ func (m *MockGitHubServer) handleProjectItemsQuery(w http.ResponseWriter, projec
 				}
 			}
 
+			// Build field values in the format expected by GetProjectItemByIssue query
+			// The shurcooL graphql library handles inline fragments by checking field
+			// presence, not __typename, so we include all expected fields
+			fieldValues := []map[string]interface{}{
+				{
+					// These fields match ProjectV2ItemFieldSingleSelectValue inline fragment
+					"field": map[string]interface{}{
+						// This field matches ProjectV2SingleSelectField inline fragment
+						"id": "PVTSSF_Status",
+					},
+					"optionId": item.ColumnID,
+					"name":     columnName,
+				},
+			}
+
 			items = append(items, map[string]interface{}{
 				"id": fmt.Sprintf("PVTI_%d", item.IssueNumber),
 				"content": map[string]interface{}{
@@ -1045,31 +1076,44 @@ func (m *MockGitHubServer) handleProjectItemsQuery(w http.ResponseWriter, projec
 					"number":     issue.Number,
 					"title":      issue.Title,
 					"state":      strings.ToUpper(issue.State),
+					"url":        fmt.Sprintf("https://github.com/test-owner/test-repo/issues/%d", issue.Number),
 				},
-				"fieldValueByName": map[string]interface{}{
-					"__typename": "ProjectV2ItemFieldSingleSelectValue",
-					"name":       columnName,
-					"optionId":   item.ColumnID,
+				"fieldValues": map[string]interface{}{
+					"nodes": fieldValues,
 				},
 			})
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"data": map[string]interface{}{
-			"repository": map[string]interface{}{
-				"projectV2": map[string]interface{}{
-					"id":     fmt.Sprintf("PVT_%d", project.ID),
-					"title":  project.Title,
-					"number": project.ID,
-					"items": map[string]interface{}{
-						"nodes": items,
-					},
-				},
+	projectData := map[string]interface{}{
+		"id":     fmt.Sprintf("PVT_%d", project.ID),
+		"title":  project.Title,
+		"number": project.ID,
+		"items": map[string]interface{}{
+			"nodes": items,
+			"pageInfo": map[string]interface{}{
+				"hasNextPage": false,
+				"endCursor":   nil,
 			},
 		},
-	})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if isNodeQuery {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"data": map[string]interface{}{
+				"node": projectData,
+			},
+		})
+	} else {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"data": map[string]interface{}{
+				"repository": map[string]interface{}{
+					"projectV2": projectData,
+				},
+			},
+		})
+	}
 }
 
 // handleIssueNodeIDQuery returns the GraphQL node ID for an issue.
