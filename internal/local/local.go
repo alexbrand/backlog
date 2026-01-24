@@ -396,6 +396,32 @@ func (l *Local) Delete(id string) error {
 // Move transitions a task to a new status.
 // This is the public method that commits changes to git if enabled.
 func (l *Local) Move(id string, status backend.Status) (*backend.Task, error) {
+	// When git_sync is enabled, check for uncommitted changes first
+	if l.gitSync {
+		hasUncommitted, err := l.hasUncommittedChanges()
+		if err != nil {
+			return nil, fmt.Errorf("failed to check for uncommitted changes: %w", err)
+		}
+		if hasUncommitted {
+			return nil, &UncommittedChangesError{
+				Message: "please commit or stash your changes before running this command",
+			}
+		}
+
+		// Check if remote is ahead - if so, fail with conflict error
+		// This ensures we detect when another agent has pushed changes
+		ahead, err := l.isRemoteAhead()
+		if err != nil {
+			return nil, fmt.Errorf("failed to check remote status: %w", err)
+		}
+		if ahead {
+			return nil, &SyncConflictError{
+				Operation: "sync",
+				Message:   "conflict: remote has changes - run 'backlog sync' to update",
+			}
+		}
+	}
+
 	task, err := l.moveInternal(id, status)
 	if err != nil {
 		return nil, err
@@ -404,6 +430,20 @@ func (l *Local) Move(id string, status backend.Status) (*backend.Task, error) {
 	// Git commit if enabled
 	if err := l.gitCommit("move", id); err != nil {
 		return nil, fmt.Errorf("failed to commit: %w", err)
+	}
+
+	// Push to remote if git_sync is enabled
+	if l.gitSync {
+		if err := l.gitPush(); err != nil {
+			// Check if it's a push conflict
+			if _, isConflict := err.(*GitPushConflictError); isConflict {
+				return nil, &SyncConflictError{
+					Operation: "push",
+					Message:   "remote has changes that conflict with local changes",
+				}
+			}
+			return nil, fmt.Errorf("failed to push: %w", err)
+		}
 	}
 
 	return task, nil
@@ -1069,7 +1109,7 @@ type ClaimConflictError struct {
 }
 
 func (e *ClaimConflictError) Error() string {
-	return fmt.Sprintf("task %s is already claimed by agent %s", e.TaskID, e.ClaimedBy)
+	return fmt.Sprintf("conflict: task %s is already claimed by agent %s", e.TaskID, e.ClaimedBy)
 }
 
 // ReleaseConflictError represents an error when trying to release a task that
@@ -1145,13 +1185,18 @@ func (l *Local) gitPull() error {
 		return nil
 	}
 
-	pullCmd := exec.Command("git", "pull")
+	// Use git pull with -c option to set rebase mode, handling divergent branches
+	pullCmd := exec.Command("git", "-c", "pull.rebase=true", "pull")
 	pullCmd.Dir = gitDir
 	pullOutput, err := pullCmd.CombinedOutput()
 	if err != nil {
 		outputStr := string(pullOutput)
 		// Check for conflicts
 		if strings.Contains(outputStr, "CONFLICT") || strings.Contains(outputStr, "conflict") {
+			// Abort the rebase to leave the repo in a clean state
+			abortCmd := exec.Command("git", "rebase", "--abort")
+			abortCmd.Dir = gitDir
+			abortCmd.CombinedOutput()
 			return &SyncConflictError{
 				Operation: "pull",
 				Message:   outputStr,
@@ -1223,6 +1268,82 @@ type GitPushConflictError struct {
 
 func (e *GitPushConflictError) Error() string {
 	return fmt.Sprintf("git push conflict: %s", e.Message)
+}
+
+// UncommittedChangesError represents uncommitted changes in the git working tree.
+// This error is returned when git_sync is enabled and there are uncommitted changes
+// that would interfere with automatic commit/push operations.
+type UncommittedChangesError struct {
+	Message string
+}
+
+func (e *UncommittedChangesError) Error() string {
+	return fmt.Sprintf("uncommitted changes: %s", e.Message)
+}
+
+// isRemoteAhead checks if the remote repository has commits that local doesn't have.
+// This is used to detect when another agent has pushed changes.
+func (l *Local) isRemoteAhead() (bool, error) {
+	gitDir := filepath.Dir(l.path)
+
+	// Check if there's a remote configured
+	remoteCmd := exec.Command("git", "remote")
+	remoteCmd.Dir = gitDir
+	remoteOutput, err := remoteCmd.Output()
+	if err != nil || strings.TrimSpace(string(remoteOutput)) == "" {
+		// No remote configured
+		return false, nil
+	}
+
+	// Fetch the latest from remote without merging
+	fetchCmd := exec.Command("git", "fetch")
+	fetchCmd.Dir = gitDir
+	if _, err := fetchCmd.CombinedOutput(); err != nil {
+		// Fetch failed (maybe network issue), don't treat as conflict
+		return false, nil
+	}
+
+	// Compare local HEAD with remote tracking branch
+	// Check how many commits we're behind
+	behindCmd := exec.Command("git", "rev-list", "--count", "HEAD..@{upstream}")
+	behindCmd.Dir = gitDir
+	behindOutput, err := behindCmd.Output()
+	if err != nil {
+		// No upstream configured or other issue
+		return false, nil
+	}
+
+	behind := strings.TrimSpace(string(behindOutput))
+	if behind == "" || behind == "0" {
+		return false, nil
+	}
+
+	// Remote has commits we don't have
+	return true, nil
+}
+
+// hasUncommittedChanges checks if there are uncommitted changes in the git repository.
+// Returns true if there are staged or unstaged changes.
+func (l *Local) hasUncommittedChanges() (bool, error) {
+	gitDir := filepath.Dir(l.path)
+
+	// Check if we're in a git repository
+	gitCmd := exec.Command("git", "rev-parse", "--git-dir")
+	gitCmd.Dir = gitDir
+	if err := gitCmd.Run(); err != nil {
+		// Not a git repository
+		return false, nil
+	}
+
+	// Check for uncommitted changes using git status
+	statusCmd := exec.Command("git", "status", "--porcelain")
+	statusCmd.Dir = gitDir
+	output, err := statusCmd.Output()
+	if err != nil {
+		return false, fmt.Errorf("failed to check git status: %w", err)
+	}
+
+	return len(strings.TrimSpace(string(output))) > 0, nil
 }
 
 // Sync synchronizes the local backlog with a remote git repository.

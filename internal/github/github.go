@@ -159,7 +159,8 @@ func (g *GitHub) Connect(cfg backend.Config) error {
 		if statusFieldName == "" {
 			statusFieldName = "Status"
 		}
-		pc, err := NewProjectsClient(g.ctx, token, g.owner, g.repo, wsCfg.Project, statusFieldName)
+		apiURL := os.Getenv("GITHUB_API_URL")
+		pc, err := NewProjectsClient(g.ctx, token, g.owner, g.repo, wsCfg.Project, statusFieldName, apiURL)
 		if err != nil {
 			return fmt.Errorf("failed to create projects client: %w", err)
 		}

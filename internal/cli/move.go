@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/alexbrand/backlog/internal/backend"
+	"github.com/alexbrand/backlog/internal/local"
 	"github.com/alexbrand/backlog/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -65,6 +66,14 @@ func runMove(id, statusStr, comment string) error {
 	// Move the task
 	task, err := b.Move(id, status)
 	if err != nil {
+		// Check for uncommitted changes error (exit code 1)
+		if _, ok := err.(*local.UncommittedChangesError); ok {
+			return GeneralError(err.Error())
+		}
+		// Check for sync conflict error (exit code 2)
+		if _, ok := err.(*local.SyncConflictError); ok {
+			return ConflictError(err.Error())
+		}
 		// Check if this is a "not found" error (case-insensitive check for 404/Not Found)
 		errLower := strings.ToLower(err.Error())
 		if strings.Contains(errLower, "not found") || strings.Contains(errLower, "404") {

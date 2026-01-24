@@ -270,12 +270,14 @@ func (m *MockGitHubServer) handleRepos(w http.ResponseWriter, r *http.Request) {
 
 	// Parse the path: /repos/{owner}/{repo}/...
 	// Match patterns:
+	// /repos/{owner}/{repo}
 	// /repos/{owner}/{repo}/issues
 	// /repos/{owner}/{repo}/issues/{number}
 	// /repos/{owner}/{repo}/issues/{number}/comments
 	// /repos/{owner}/{repo}/issues/{number}/labels
 	// /repos/{owner}/{repo}/issues/{number}/labels/{name}
 
+	repoPattern := regexp.MustCompile(`^/repos/([^/]+)/([^/]+)$`)
 	issuesListPattern := regexp.MustCompile(`^/repos/[^/]+/[^/]+/issues$`)
 	issuePattern := regexp.MustCompile(`^/repos/[^/]+/[^/]+/issues/(\d+)$`)
 	commentsPattern := regexp.MustCompile(`^/repos/[^/]+/[^/]+/issues/(\d+)/comments$`)
@@ -283,6 +285,9 @@ func (m *MockGitHubServer) handleRepos(w http.ResponseWriter, r *http.Request) {
 	labelPattern := regexp.MustCompile(`^/repos/[^/]+/[^/]+/issues/(\d+)/labels/(.+)$`)
 
 	switch {
+	case repoPattern.MatchString(path):
+		matches := repoPattern.FindStringSubmatch(path)
+		m.handleRepository(w, r, matches[1], matches[2])
 	case issuesListPattern.MatchString(path):
 		m.handleIssuesList(w, r)
 	case commentsPattern.MatchString(path):
@@ -317,6 +322,30 @@ func (m *MockGitHubServer) handleIssuesList(w http.ResponseWriter, r *http.Reque
 	default:
 		m.writeError(w, http.StatusMethodNotAllowed, "Method Not Allowed", "Method Not Allowed")
 	}
+}
+
+// handleRepository handles GET /repos/{owner}/{repo}
+func (m *MockGitHubServer) handleRepository(w http.ResponseWriter, r *http.Request, owner, repo string) {
+	if r.Method != http.MethodGet {
+		m.writeError(w, http.StatusMethodNotAllowed, "Method Not Allowed", "Method Not Allowed")
+		return
+	}
+
+	// Return a mock repository response
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"id":        1,
+		"name":      repo,
+		"full_name": owner + "/" + repo,
+		"owner": map[string]interface{}{
+			"login": owner,
+		},
+		"private":       false,
+		"html_url":      fmt.Sprintf("https://github.com/%s/%s", owner, repo),
+		"description":   "Test repository",
+		"fork":          false,
+		"default_branch": "main",
+	})
 }
 
 // listIssues handles GET /repos/{owner}/{repo}/issues
@@ -741,8 +770,8 @@ func (m *MockGitHubServer) issueToJSON(issue *MockGitHubIssue) map[string]interf
 		"body":       issue.Body,
 		"created_at": time.Now().Format(time.RFC3339),
 		"updated_at": time.Now().Format(time.RFC3339),
-		"html_url":   fmt.Sprintf("%s/test-owner/test-repo/issues/%d", m.URL, issue.Number),
-		"url":        fmt.Sprintf("%s/repos/test-owner/test-repo/issues/%d", m.URL, issue.Number),
+		"html_url":   fmt.Sprintf("https://github.com/test-owner/test-repo/issues/%d", issue.Number),
+		"url":        fmt.Sprintf("https://api.github.com/repos/test-owner/test-repo/issues/%d", issue.Number),
 	}
 
 	// Add labels array
@@ -804,6 +833,12 @@ func (m *MockGitHubServer) handleGraphQL(w http.ResponseWriter, r *http.Request)
 	// Parse and handle different GraphQL queries/mutations
 	query := strings.TrimSpace(req.Query)
 
+	// Check for issue node ID query (used by GetIssueNodeID)
+	if strings.Contains(query, "repository") && strings.Contains(query, "issue") && !strings.Contains(query, "projectV2") {
+		m.handleIssueNodeIDQuery(w, req.Variables)
+		return
+	}
+
 	// Check for project query patterns
 	if strings.Contains(query, "projectV2") || strings.Contains(query, "ProjectV2") {
 		m.handleProjectQuery(w, query, req.Variables)
@@ -822,27 +857,41 @@ func (m *MockGitHubServer) handleProjectQuery(w http.ResponseWriter, query strin
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	// Extract project number from variables or query
+	// Extract project info from variables
+	// GetProjectID query uses "projectNumber" (int)
+	// GetStatusField query uses "projectId" (string like "PVT_1")
 	var projectNumber int
+	var projectID string
+
 	if num, ok := variables["projectNumber"].(float64); ok {
 		projectNumber = int(num)
 	} else if num, ok := variables["number"].(float64); ok {
 		projectNumber = int(num)
 	}
 
+	if id, ok := variables["projectId"].(string); ok {
+		projectID = id
+		// Extract project number from ID like "PVT_1"
+		if strings.HasPrefix(projectID, "PVT_") {
+			fmt.Sscanf(projectID, "PVT_%d", &projectNumber)
+		}
+	}
+
 	// Check if this is an invalid project ID
-	if m.InvalidProjectIDs[projectNumber] {
+	if projectNumber > 0 && m.InvalidProjectIDs[projectNumber] {
 		m.writeGraphQLError(w, fmt.Sprintf("Could not find project with number %d", projectNumber))
 		return
 	}
 
-	// Check if project exists
-	project, exists := m.Projects[projectNumber]
-	if !exists && projectNumber > 0 {
-		// If no project is set up but a query is made, return empty but valid response
-		// This mimics GitHub behavior when project doesn't exist
-		m.writeGraphQLError(w, fmt.Sprintf("Could not find project with number %d", projectNumber))
-		return
+	// Check if project exists (only for queries that specify a project)
+	var project *MockGitHubProject
+	if projectNumber > 0 {
+		var exists bool
+		project, exists = m.Projects[projectNumber]
+		if !exists {
+			m.writeGraphQLError(w, fmt.Sprintf("Could not find project with number %d", projectNumber))
+			return
+		}
 	}
 
 	// Build response based on query type
@@ -863,6 +912,7 @@ func (m *MockGitHubServer) handleProjectQuery(w http.ResponseWriter, query strin
 }
 
 // handleProjectInfoQuery returns basic project information.
+// Only returns the "id" field to match what the GraphQL query expects.
 func (m *MockGitHubServer) handleProjectInfoQuery(w http.ResponseWriter, project *MockGitHubProject) {
 	if project == nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -881,9 +931,7 @@ func (m *MockGitHubServer) handleProjectInfoQuery(w http.ResponseWriter, project
 		"data": map[string]interface{}{
 			"repository": map[string]interface{}{
 				"projectV2": map[string]interface{}{
-					"id":     fmt.Sprintf("PVT_%d", project.ID),
-					"title":  project.Title,
-					"number": project.ID,
+					"id": fmt.Sprintf("PVT_%d", project.ID),
 				},
 			},
 		},
@@ -914,21 +962,14 @@ func (m *MockGitHubServer) handleProjectFieldsQuery(w http.ResponseWriter, proje
 	}
 
 	// Build the fields array with Status as a single-select field
-	// and include built-in fields like Title
+	// Note: githubv4 uses inline fragments, each field will be unmarshaled
+	// into the appropriate struct based on what fields are present
 	fieldNodes := []map[string]interface{}{
 		{
-			// Title field (regular ProjectV2Field)
-			"__typename": "ProjectV2Field",
-			"id":         "PVTF_Title",
-			"name":       "Title",
-			"dataType":   "TITLE",
-		},
-		{
-			// Status field (single-select)
-			"__typename": "ProjectV2SingleSelectField",
-			"id":         "PVTSSF_Status",
-			"name":       "Status",
-			"options":    options,
+			// Status field (single-select) - only include fields the query expects
+			"id":      "PVTSSF_Status",
+			"name":    "Status",
+			"options": options,
 		},
 	}
 
@@ -1004,6 +1045,38 @@ func (m *MockGitHubServer) handleProjectItemsQuery(w http.ResponseWriter, projec
 					"items": map[string]interface{}{
 						"nodes": items,
 					},
+				},
+			},
+		},
+	})
+}
+
+// handleIssueNodeIDQuery returns the GraphQL node ID for an issue.
+// This handles queries like: repository(owner: $owner, name: $repo) { issue(number: $number) { id } }
+func (m *MockGitHubServer) handleIssueNodeIDQuery(w http.ResponseWriter, variables map[string]interface{}) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// Extract issue number from variables
+	var issueNumber int
+	if num, ok := variables["number"].(float64); ok {
+		issueNumber = int(num)
+	}
+
+	// Check if issue exists
+	issue, exists := m.Issues[issueNumber]
+	if !exists {
+		m.writeGraphQLError(w, fmt.Sprintf("Could not resolve to an Issue with number %d", issueNumber))
+		return
+	}
+
+	// Return the issue's node ID
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]interface{}{
+			"repository": map[string]interface{}{
+				"issue": map[string]interface{}{
+					"id": fmt.Sprintf("I_%d", issue.Number),
 				},
 			},
 		},

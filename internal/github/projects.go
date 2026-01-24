@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/alexbrand/backlog/internal/backend"
 	"github.com/shurcooL/githubv4"
@@ -47,7 +48,8 @@ type ProjectItem struct {
 }
 
 // NewProjectsClient creates a new GraphQL client for GitHub Projects v2.
-func NewProjectsClient(ctx context.Context, token, owner, repo string, projectNum int, statusField string) (*ProjectsClient, error) {
+// If apiURL is provided, it will be used as the GraphQL endpoint (for testing/enterprise).
+func NewProjectsClient(ctx context.Context, token, owner, repo string, projectNum int, statusField, apiURL string) (*ProjectsClient, error) {
 	if token == "" {
 		return nil, errors.New("github token is required")
 	}
@@ -58,8 +60,21 @@ func NewProjectsClient(ctx context.Context, token, owner, repo string, projectNu
 	src := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
 	httpClient := oauth2.NewClient(ctx, src)
 
+	var client *githubv4.Client
+	if apiURL != "" {
+		// Use custom GraphQL endpoint (for testing or GitHub Enterprise)
+		graphqlURL := apiURL
+		if !strings.HasSuffix(graphqlURL, "/") {
+			graphqlURL += "/"
+		}
+		graphqlURL += "graphql"
+		client = githubv4.NewEnterpriseClient(graphqlURL, httpClient)
+	} else {
+		client = githubv4.NewClient(httpClient)
+	}
+
 	return &ProjectsClient{
-		client:      githubv4.NewClient(httpClient),
+		client:      client,
 		ctx:         ctx,
 		owner:       owner,
 		repo:        repo,

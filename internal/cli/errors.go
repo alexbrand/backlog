@@ -66,6 +66,11 @@ func InvalidInputError(message string) *ExitCodeError {
 	return &ExitCodeError{Code: ExitError, JSONCode: "INVALID_INPUT", Message: message}
 }
 
+// GeneralError creates a general error (exit code 1).
+func GeneralError(message string) *ExitCodeError {
+	return &ExitCodeError{Code: ExitError, Message: message}
+}
+
 // AuthError creates an authentication error (exit code 1).
 func AuthError(message string) *ExitCodeError {
 	return &ExitCodeError{Code: ExitError, JSONCode: "AUTH_ERROR", Message: message}
@@ -73,7 +78,7 @@ func AuthError(message string) *ExitCodeError {
 
 // WrapAuthError wraps an existing error as an authentication error.
 func WrapAuthError(message string, err error) *ExitCodeError {
-	return &ExitCodeError{Code: ExitError, JSONCode: "AUTH_ERROR", Message: message, Err: err}
+	return &ExitCodeError{Code: ExitError, JSONCode: "AUTH_ERROR", Message: "auth error: " + message, Err: err}
 }
 
 // IsAuthError checks if an error is an authentication-related error.

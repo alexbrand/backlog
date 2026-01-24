@@ -1292,6 +1292,33 @@ func taskIsClaimedByAgent(ctx context.Context, taskID, agentID string) (context.
 		return ctx, fmt.Errorf("failed to create lock file: %w", err)
 	}
 
+	// If this is a git repo, commit the changes so subsequent git operations work
+	gitDir := filepath.Join(env.TempDir, ".git")
+	if _, err := os.Stat(gitDir); err == nil {
+		// We're in a git repo, commit the claim changes
+		cmd := exec.Command("git", "add", "-A")
+		cmd.Dir = env.TempDir
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return ctx, fmt.Errorf("failed to git add: %w\nOutput: %s", err, output)
+		}
+
+		cmd = exec.Command("git", "commit", "-m", fmt.Sprintf("claim: %s [agent:%s]", taskID, agentID))
+		cmd.Dir = env.TempDir
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return ctx, fmt.Errorf("failed to git commit: %w\nOutput: %s", err, output)
+		}
+
+		// Also push if there's a remote
+		cmd = exec.Command("git", "remote")
+		cmd.Dir = env.TempDir
+		remoteOutput, _ := cmd.Output()
+		if strings.TrimSpace(string(remoteOutput)) != "" {
+			cmd = exec.Command("git", "push")
+			cmd.Dir = env.TempDir
+			cmd.CombinedOutput() // Ignore push errors (remote might not exist)
+		}
+	}
+
 	return ctx, nil
 }
 
@@ -1675,6 +1702,13 @@ func aGitRepositoryIsInitialized(ctx context.Context) (context.Context, error) {
 	cmd.Dir = env.TempDir
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return ctx, fmt.Errorf("failed to configure git name: %w\nOutput: %s", err, output)
+	}
+
+	// Configure pull strategy to rebase to handle divergent branches
+	cmd = exec.Command("git", "config", "pull.rebase", "true")
+	cmd.Dir = env.TempDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return ctx, fmt.Errorf("failed to configure git pull.rebase: %w\nOutput: %s", err, output)
 	}
 
 	return ctx, nil
@@ -2254,6 +2288,23 @@ func anotherAgentHasClaimedTaskAndPushed(ctx context.Context, taskID string) (co
 		return ctx, fmt.Errorf("remote repository path not found in context")
 	}
 
+	// First, ensure local task files are committed and pushed to remote
+	// so the other agent can see them
+	cmd := exec.Command("git", "add", "-A")
+	cmd.Dir = env.TempDir
+	cmd.CombinedOutput()
+	cmd = exec.Command("git", "commit", "-m", "Add backlog tasks")
+	cmd.Dir = env.TempDir
+	cmd.CombinedOutput() // Ignore errors - might already be committed
+	cmd = exec.Command("git", "push")
+	cmd.Dir = env.TempDir
+	if output, err := cmd.CombinedOutput(); err != nil {
+		// If push fails, it might be because nothing to push - that's OK
+		if !strings.Contains(string(output), "Everything up-to-date") {
+			return ctx, fmt.Errorf("failed to push local changes: %w\nOutput: %s", err, output)
+		}
+	}
+
 	// Clone the remote to a temp directory
 	cloneDir, err := os.MkdirTemp("", "backlog-other-agent-*")
 	if err != nil {
@@ -2261,7 +2312,7 @@ func anotherAgentHasClaimedTaskAndPushed(ctx context.Context, taskID string) (co
 	}
 	defer os.RemoveAll(cloneDir)
 
-	cmd := exec.Command("git", "clone", remotePath, cloneDir)
+	cmd = exec.Command("git", "clone", remotePath, cloneDir)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return ctx, fmt.Errorf("failed to clone remote: %w\nOutput: %s", err, output)
 	}
@@ -2290,7 +2341,11 @@ func anotherAgentHasClaimedTaskAndPushed(ctx context.Context, taskID string) (co
 
 	if len(matches) == 0 {
 		// Create a simple change instead
-		changeFile := filepath.Join(cloneDir, ".backlog", "claimed-by-other.txt")
+		backlogDir := filepath.Join(cloneDir, ".backlog")
+		if err := os.MkdirAll(backlogDir, 0755); err != nil {
+			return ctx, fmt.Errorf("failed to create .backlog directory: %w", err)
+		}
+		changeFile := filepath.Join(backlogDir, "claimed-by-other.txt")
 		if err := os.WriteFile(changeFile, []byte("Claimed by other-agent"), 0644); err != nil {
 			return ctx, fmt.Errorf("failed to create claim marker: %w", err)
 		}
