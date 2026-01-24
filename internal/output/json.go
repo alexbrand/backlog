@@ -166,6 +166,14 @@ func (f *JSONFormatter) FormatHealthCheck(w io.Writer, backendName string, ws *c
 	return f.writeJSON(w, result)
 }
 
+// FormatDeleted outputs the result of deleting a task as JSON.
+func (f *JSONFormatter) FormatDeleted(w io.Writer, id string) error {
+	return f.writeJSON(w, map[string]any{
+		"id":      id,
+		"deleted": true,
+	})
+}
+
 // writeJSON encodes the value as indented JSON and writes it to w.
 func (f *JSONFormatter) writeJSON(w io.Writer, v any) error {
 	enc := json.NewEncoder(w)

@@ -390,6 +390,11 @@ func (l *Local) Delete(id string) error {
 		return fmt.Errorf("failed to delete task: %w", err)
 	}
 
+	// Git commit if enabled
+	if err := l.gitCommit("delete", id); err != nil {
+		return fmt.Errorf("failed to commit: %w", err)
+	}
+
 	return nil
 }
 

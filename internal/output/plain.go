@@ -140,3 +140,9 @@ func (f *PlainFormatter) FormatHealthCheck(w io.Writer, backendName string, ws *
 	}
 	return nil
 }
+
+// FormatDeleted outputs the result of deleting a task in plain format.
+func (f *PlainFormatter) FormatDeleted(w io.Writer, id string) error {
+	fmt.Fprintln(w, id)
+	return nil
+}

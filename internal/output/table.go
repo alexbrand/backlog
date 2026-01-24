@@ -218,3 +218,9 @@ func (f *TableFormatter) FormatHealthCheck(w io.Writer, backendName string, ws *
 	}
 	return nil
 }
+
+// FormatDeleted outputs the result of deleting a task.
+func (f *TableFormatter) FormatDeleted(w io.Writer, id string) error {
+	fmt.Fprintf(w, "Deleted %s\n", id)
+	return nil
+}

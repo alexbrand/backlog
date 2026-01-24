@@ -133,6 +133,7 @@ export LINEAR_API_KEY=lin_api_xxxx
 | `backlog show <id>` | Display full task details |
 | `backlog edit <id>` | Modify task fields |
 | `backlog move <id> <status>` | Transition task to a new status |
+| `backlog delete <id>` | Remove a task permanently |
 | `backlog comment <id> <message>` | Add a comment to a task |
 
 ### Agent Coordination

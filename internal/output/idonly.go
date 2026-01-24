@@ -99,3 +99,9 @@ func (f *IDOnlyFormatter) FormatHealthCheck(w io.Writer, backendName string, ws 
 	// id-only format doesn't output health status
 	return nil
 }
+
+// FormatDeleted outputs the deleted task ID.
+func (f *IDOnlyFormatter) FormatDeleted(w io.Writer, id string) error {
+	fmt.Fprintln(w, id)
+	return nil
+}

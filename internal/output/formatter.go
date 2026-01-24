@@ -76,6 +76,9 @@ type Formatter interface {
 
 	// FormatHealthCheck outputs health check results.
 	FormatHealthCheck(w io.Writer, backendName string, ws *config.Workspace, status *backend.HealthStatus) error
+
+	// FormatDeleted outputs the result of deleting a task.
+	FormatDeleted(w io.Writer, id string) error
 }
 
 // New creates a formatter for the specified format.
