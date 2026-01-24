@@ -71,7 +71,7 @@ Instructions:
 2. Fix the code to make the tests pass.
 3. Do NOT modify the tests themselves unless they are clearly wrong.
 4. Focus only on fixing the failures shown above.
-5. After making fixes, output <promise>FIXED</promise> to indicate you've made changes.
+5. After making fixes, commit, push, and output <promise>FIXED</promise> to indicate you've made changes.
 6. If you cannot fix the issue (e.g., it requires external changes), output <promise>BLOCKED</promise> with an explanation." | pretty-claude-stream | tee /dev/tty)
 
   # Check if Claude indicated it's blocked
