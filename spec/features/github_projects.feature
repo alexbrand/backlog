@@ -76,6 +76,18 @@ Feature: GitHub Projects
   @github @projects
   Scenario: Health check without project configured still works
     # When no project is configured, the backend should work with issues only
+    Given a config file with the following content:
+      """
+      version: 1
+      defaults:
+        workspace: github
+      workspaces:
+        github:
+          backend: github
+          repo: test-owner/test-repo
+          api_key_env: GITHUB_TOKEN
+          default: true
+      """
     When I run "backlog config health"
     Then the exit code should be 0
     And stdout should contain "github"
