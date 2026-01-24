@@ -51,7 +51,7 @@ Feature: GitHub Projects
     When I run "backlog config show -f json"
     Then the exit code should be 0
     And the JSON output should be valid
-    And the JSON output should have "workspace.project" equal to "1"
+    And the JSON output should have "workspaces.github.project" equal to "1"
 
   @github @projects
   Scenario: Connect to repository with invalid project returns error

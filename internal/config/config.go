@@ -11,45 +11,45 @@ import (
 
 // Config represents the top-level configuration structure.
 type Config struct {
-	Version    int                  `mapstructure:"version"`
-	Defaults   Defaults             `mapstructure:"defaults"`
-	Workspaces map[string]Workspace `mapstructure:"workspaces"`
+	Version    int                  `mapstructure:"version" json:"version"`
+	Defaults   Defaults             `mapstructure:"defaults" json:"defaults"`
+	Workspaces map[string]Workspace `mapstructure:"workspaces" json:"workspaces"`
 }
 
 // Defaults contains global default settings.
 type Defaults struct {
-	Format           string `mapstructure:"format"`
-	Workspace        string `mapstructure:"workspace"`
-	AgentID          string `mapstructure:"agent_id"`
+	Format    string `mapstructure:"format" json:"format,omitempty"`
+	Workspace string `mapstructure:"workspace" json:"workspace,omitempty"`
+	AgentID   string `mapstructure:"agent_id" json:"agent_id,omitempty"`
 }
 
 // Workspace represents a configured connection to a backend.
 type Workspace struct {
-	Backend          string            `mapstructure:"backend"`
-	Repo             string            `mapstructure:"repo"`
-	Team             string            `mapstructure:"team"`
-	Path             string            `mapstructure:"path"`
-	Project          int               `mapstructure:"project"`
-	StatusField      string            `mapstructure:"status_field"`
-	AgentID          string            `mapstructure:"agent_id"`
-	AgentLabelPrefix string            `mapstructure:"agent_label_prefix"`
-	Default          bool              `mapstructure:"default"`
-	APIKeyEnv        string            `mapstructure:"api_key_env"`
-	LockMode         string            `mapstructure:"lock_mode"`
-	GitSync          bool              `mapstructure:"git_sync"`
-	StatusMap        map[string]Status `mapstructure:"status_map"`
-	DefaultFilters   DefaultFilters    `mapstructure:"default_filters"`
+	Backend          string            `mapstructure:"backend" json:"backend,omitempty"`
+	Repo             string            `mapstructure:"repo" json:"repo,omitempty"`
+	Team             string            `mapstructure:"team" json:"team,omitempty"`
+	Path             string            `mapstructure:"path" json:"path,omitempty"`
+	Project          int               `mapstructure:"project" json:"project,omitempty"`
+	StatusField      string            `mapstructure:"status_field" json:"status_field,omitempty"`
+	AgentID          string            `mapstructure:"agent_id" json:"agent_id,omitempty"`
+	AgentLabelPrefix string            `mapstructure:"agent_label_prefix" json:"agent_label_prefix,omitempty"`
+	Default          bool              `mapstructure:"default" json:"default,omitempty"`
+	APIKeyEnv        string            `mapstructure:"api_key_env" json:"api_key_env,omitempty"`
+	LockMode         string            `mapstructure:"lock_mode" json:"lock_mode,omitempty"`
+	GitSync          bool              `mapstructure:"git_sync" json:"git_sync,omitempty"`
+	StatusMap        map[string]Status `mapstructure:"status_map" json:"status_map,omitempty"`
+	DefaultFilters   DefaultFilters    `mapstructure:"default_filters" json:"default_filters,omitempty"`
 }
 
 // Status represents a status mapping configuration.
 type Status struct {
-	State  string   `mapstructure:"state"`
-	Labels []string `mapstructure:"labels"`
+	State  string   `mapstructure:"state" json:"state,omitempty"`
+	Labels []string `mapstructure:"labels" json:"labels,omitempty"`
 }
 
 // DefaultFilters represents default filters for a workspace.
 type DefaultFilters struct {
-	Labels []string `mapstructure:"labels"`
+	Labels []string `mapstructure:"labels" json:"labels,omitempty"`
 }
 
 var (
