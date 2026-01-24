@@ -5,7 +5,7 @@ BINARY_NAME := backlog
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_TIME := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
-LDFLAGS := -ldflags "-s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.buildTime=$(BUILD_TIME)"
+LDFLAGS := -ldflags "-s -w -X github.com/alexbrand/backlog/internal/cli.Version=$(VERSION) -X github.com/alexbrand/backlog/internal/cli.GitCommit=$(COMMIT) -X github.com/alexbrand/backlog/internal/cli.BuildDate=$(BUILD_TIME)"
 
 # Output directory
 DIST_DIR := dist
