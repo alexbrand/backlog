@@ -17,3 +17,6 @@ Write tests first. Run `make test` and `make spec` to verify changes.
 Use format: `type(scope): description`
 
 Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
+
+### Documentation Updates
+Update `README.md` when making changes that affect usage or functionality.
