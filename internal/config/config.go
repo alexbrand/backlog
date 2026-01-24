@@ -3,8 +3,6 @@ package config
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/spf13/viper"
 )
@@ -57,34 +55,18 @@ var (
 	cfgFile string
 )
 
-// configDir returns the configuration directory path.
-func configDir() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to get home directory: %w", err)
-	}
-	return filepath.Join(home, ".config", "backlog"), nil
-}
-
 // Init initializes the configuration system.
 // Config files are searched in the following order:
 // 1. Explicit path via cfgPath parameter (--config flag)
 // 2. Project-local: .backlog/config.yaml (current directory)
-// 3. User global: ~/.config/backlog/config.yaml
 func Init(cfgPath string) error {
 	cfgFile = cfgPath
 
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
-		// Check for project-local config first
+		// Only look for project-local config
 		viper.AddConfigPath(".backlog")
-		// Then check user global config
-		configPath, err := configDir()
-		if err != nil {
-			return err
-		}
-		viper.AddConfigPath(configPath)
 		viper.SetConfigName("config")
 		viper.SetConfigType("yaml")
 	}
@@ -164,13 +146,4 @@ func GetWorkspace(name string) (*Workspace, string, error) {
 // ConfigFilePath returns the path to the config file being used.
 func ConfigFilePath() string {
 	return viper.ConfigFileUsed()
-}
-
-// DefaultConfigPath returns the default config file path.
-func DefaultConfigPath() (string, error) {
-	dir, err := configDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, "config.yaml"), nil
 }

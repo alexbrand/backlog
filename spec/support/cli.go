@@ -65,7 +65,7 @@ func (r *CLIRunner) RunArgs(args ...string) *CommandResult {
 }
 
 // RunWithInput executes a command string with stdin input and captures the result.
-// Example: RunWithInput("main\n1\nowner/repo\n", "backlog config init")
+// Example: RunWithInput("2\n1\n", "backlog init")
 func (r *CLIRunner) RunWithInput(input string, commandStr string) *CommandResult {
 	args := parseArgs(commandStr)
 	// Strip "backlog" prefix if present since the binary is already named "backlog"

@@ -1278,7 +1278,7 @@ func theEnvironmentVariableIs(ctx context.Context, key, value string) (context.C
 }
 
 // homeIsSetToTheTestDirectory sets HOME to the test temp directory.
-// This redirects where config init writes the global config file.
+// This is used for tests that need to access ~/.config/backlog/credentials.yaml.
 func homeIsSetToTheTestDirectory(ctx context.Context) (context.Context, error) {
 	env := getTestEnv(ctx)
 	if env == nil {

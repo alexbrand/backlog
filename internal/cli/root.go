@@ -42,7 +42,7 @@ func Execute() error {
 
 func init() {
 	// Config file flag
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/backlog/config.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is .backlog/config.yaml)")
 
 	// Global flags available to all commands
 	rootCmd.PersistentFlags().StringVarP(&workspace, "workspace", "w", "", "Target workspace (default: workspace with default: true)")
