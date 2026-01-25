@@ -286,7 +286,7 @@ func (p *ProjectsClient) UpdateProjectItemStatus(itemID string, optionID string)
 		UpdateProjectV2ItemFieldValue struct {
 			ProjectV2Item struct {
 				ID githubv4.ID
-			}
+			} `graphql:"projectV2Item"`
 		} `graphql:"updateProjectV2ItemFieldValue(input: $input)"`
 	}
 
