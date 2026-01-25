@@ -798,45 +798,11 @@ func GetProjectStatusField(ctx context.Context, token, projectID, apiURL string)
 	return "", nil, errors.New("Status field not found in project")
 }
 
-// AddStatusOption adds a single status option to the project's Status field.
-func AddStatusOption(ctx context.Context, token, projectID, fieldID, apiURL string, option StatusOption) error {
-	client := newGraphQLClient(ctx, token, apiURL)
-
-	var mutation struct {
-		UpdateProjectV2Field struct {
-			ProjectV2Field struct {
-				ID githubv4.ID
-			} `graphql:"... on ProjectV2SingleSelectField"`
-		} `graphql:"createProjectV2FieldOption(input: $input)"`
-	}
-
-	// Note: The actual mutation name is createProjectV2FieldOption, not updateProjectV2Field
-	// We need to use the correct input type
-	type CreateProjectV2FieldOptionInput struct {
-		ProjectID githubv4.ID     `json:"projectId"`
-		FieldID   githubv4.ID     `json:"fieldId"`
-		Name      githubv4.String `json:"name"`
-		Color     githubv4.String `json:"color"`
-	}
-
-	input := CreateProjectV2FieldOptionInput{
-		ProjectID: githubv4.ID(projectID),
-		FieldID:   githubv4.ID(fieldID),
-		Name:      githubv4.String(option.Name),
-		Color:     githubv4.String(option.Color),
-	}
-
-	if err := client.Mutate(ctx, &mutation, input, nil); err != nil {
-		return fmt.Errorf("failed to add status option %q: %w", option.Name, err)
-	}
-
-	return nil
-}
-
-// ConfigureProjectStatus configures the Status field with standard options.
-// It checks which options already exist and only adds missing ones.
+// ConfigureProjectStatus checks which status options exist and returns missing ones.
+// Note: GitHub's API doesn't support adding options to existing single select fields,
+// so missing options must be added manually via the GitHub UI.
 func ConfigureProjectStatus(ctx context.Context, token, projectID, apiURL string) error {
-	fieldID, existingOptions, err := GetProjectStatusField(ctx, token, projectID, apiURL)
+	_, existingOptions, err := GetProjectStatusField(ctx, token, projectID, apiURL)
 	if err != nil {
 		return err
 	}
@@ -847,13 +813,62 @@ func ConfigureProjectStatus(ctx context.Context, token, projectID, apiURL string
 		existing[opt.Name] = true
 	}
 
-	// Add missing options
+	// Check for missing options
+	var missing []string
 	for _, opt := range DefaultStatusOptions() {
 		if !existing[opt.Name] {
-			if err := AddStatusOption(ctx, token, projectID, fieldID, apiURL, opt); err != nil {
-				return err
-			}
+			missing = append(missing, opt.Name)
 		}
+	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf("missing status options (add manually in GitHub): %v", missing)
+	}
+
+	return nil
+}
+
+// GetRepositoryID returns the GraphQL node ID for a repository.
+func GetRepositoryID(ctx context.Context, token, owner, repo, apiURL string) (string, error) {
+	client := newGraphQLClient(ctx, token, apiURL)
+
+	var query struct {
+		Repository struct {
+			ID githubv4.ID
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]any{
+		"owner": githubv4.String(owner),
+		"name":  githubv4.String(repo),
+	}
+
+	if err := client.Query(ctx, &query, variables); err != nil {
+		return "", fmt.Errorf("failed to get repository ID: %w", err)
+	}
+
+	return string(query.Repository.ID.(string)), nil
+}
+
+// LinkProjectToRepository links a GitHub Project to a repository.
+func LinkProjectToRepository(ctx context.Context, token, projectID, repositoryID, apiURL string) error {
+	client := newGraphQLClient(ctx, token, apiURL)
+
+	var mutation struct {
+		LinkProjectV2ToRepository struct {
+			Repository struct {
+				ID githubv4.ID
+			}
+		} `graphql:"linkProjectV2ToRepository(input: $input)"`
+	}
+
+	input := githubv4.LinkProjectV2ToRepositoryInput{
+		ProjectID:    githubv4.ID(projectID),
+		RepositoryID: githubv4.ID(repositoryID),
+	}
+
+	if err := client.Mutate(ctx, &mutation, input, nil); err != nil {
+		return fmt.Errorf("failed to link project to repository: %w", err)
 	}
 
 	return nil

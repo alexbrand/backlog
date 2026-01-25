@@ -875,6 +875,10 @@ func (m *MockGitHubServer) handleGraphQL(w http.ResponseWriter, r *http.Request)
 			m.handleCreateFieldOptionMutation(w, req.Variables)
 			return
 		}
+		if strings.Contains(query, "linkProjectV2ToRepository") {
+			m.handleLinkProjectToRepoMutation(w, req.Variables)
+			return
+		}
 	}
 
 	// Check for owner ID queries (organization or user)
@@ -890,6 +894,12 @@ func (m *MockGitHubServer) handleGraphQL(w http.ResponseWriter, r *http.Request)
 	// Check for list projects query (repository.projectsV2)
 	if strings.Contains(query, "projectsV2") && strings.Contains(query, "repository") {
 		m.handleListProjectsQuery(w, req.Variables)
+		return
+	}
+
+	// Check for repository ID query (used by GetRepositoryID)
+	if strings.Contains(query, "repository(") && !strings.Contains(query, "issue") && !strings.Contains(query, "projectV2") && !strings.Contains(query, "projectsV2") {
+		m.handleRepositoryIDQuery(w, req.Variables)
 		return
 	}
 
@@ -1459,6 +1469,54 @@ func (m *MockGitHubServer) handleCreateFieldOptionMutation(w http.ResponseWriter
 	}
 
 	m.writeGraphQLError(w, "Project not found")
+}
+
+// handleLinkProjectToRepoMutation handles the linkProjectV2ToRepository mutation.
+func (m *MockGitHubServer) handleLinkProjectToRepoMutation(w http.ResponseWriter, variables map[string]interface{}) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Extract input from variables
+	input, ok := variables["input"].(map[string]interface{})
+	if !ok {
+		m.writeGraphQLError(w, "Invalid input")
+		return
+	}
+
+	repositoryID, _ := input["repositoryId"].(string)
+
+	// Return success response
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]interface{}{
+			"linkProjectV2ToRepository": map[string]interface{}{
+				"repository": map[string]interface{}{
+					"id": repositoryID,
+				},
+			},
+		},
+	})
+}
+
+// handleRepositoryIDQuery handles the repository ID query.
+func (m *MockGitHubServer) handleRepositoryIDQuery(w http.ResponseWriter, variables map[string]interface{}) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	owner, _ := variables["owner"].(string)
+	name, _ := variables["name"].(string)
+
+	// Generate a consistent repository ID
+	repoID := fmt.Sprintf("R_%s_%s", owner, name)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"data": map[string]interface{}{
+			"repository": map[string]interface{}{
+				"id": repoID,
+			},
+		},
+	})
 }
 
 // writeGraphQLError writes a GraphQL-style error response.

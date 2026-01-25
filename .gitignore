@@ -22,3 +22,6 @@ report.html
 
 # OS
 .DS_Store
+
+# Backlog local data
+.backlog/

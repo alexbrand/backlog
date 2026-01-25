@@ -454,14 +454,26 @@ func createNewProject(reader *bufio.Reader, ctx context.Context, token, owner, r
 
 	fmt.Printf(" created (#%d)\n", result.Number)
 
-	// Configure status options
-	fmt.Print("    Configuring status columns...")
+	// Link project to repository
+	fmt.Print("    Linking to repository...")
+	repoID, err := github.GetRepositoryID(ctx, token, owner, repo, apiURL)
+	if err != nil {
+		fmt.Printf(" warning: %v\n", err)
+	} else {
+		if err := github.LinkProjectToRepository(ctx, token, result.ID, repoID, apiURL); err != nil {
+			fmt.Printf(" warning: %v\n", err)
+		} else {
+			fmt.Println(" done")
+		}
+	}
+
+	// Check status options
+	fmt.Print("    Checking status columns...")
 	if err := github.ConfigureProjectStatus(ctx, token, result.ID, apiURL); err != nil {
 		fmt.Printf(" warning: %v\n", err)
-		// Continue anyway - project was created
+		fmt.Println("    Note: Add missing columns manually in GitHub Projects settings")
 	} else {
 		fmt.Println(" done")
-		fmt.Println("    Columns: Backlog, Todo, In Progress, Review, Done")
 	}
 
 	return result.Number, nil
