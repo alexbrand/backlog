@@ -884,3 +884,125 @@ func TestIssueToTaskNoPriority(t *testing.T) {
 		t.Errorf("Priority = %s, want none", task.Priority)
 	}
 }
+
+func TestIssueToTaskSortOrder(t *testing.T) {
+	l := New()
+	l.reverseStatusMap = map[string]backend.Status{"todo": backend.StatusTodo}
+	l.agentLabelPrefix = "agent"
+
+	t.Run("with sortOrder", func(t *testing.T) {
+		issue := map[string]any{
+			"identifier": "ENG-123",
+			"title":      "Test",
+			"sortOrder":  float64(-1234.5),
+			"state":      map[string]any{"name": "Todo"},
+		}
+
+		task := l.issueToTask(issue)
+
+		so, ok := task.Meta["sort_order"].(float64)
+		if !ok {
+			t.Fatal("Meta[sort_order] not set")
+		}
+		if so != -1234.5 {
+			t.Errorf("Meta[sort_order] = %f, want -1234.5", so)
+		}
+	})
+
+	t.Run("without sortOrder", func(t *testing.T) {
+		issue := map[string]any{
+			"identifier": "ENG-124",
+			"title":      "Test",
+			"state":      map[string]any{"name": "Todo"},
+		}
+
+		task := l.issueToTask(issue)
+
+		if _, ok := task.Meta["sort_order"]; ok {
+			t.Error("Meta[sort_order] should not be set when sortOrder is missing")
+		}
+	})
+}
+
+func TestListSortsBySortOrder(t *testing.T) {
+	server := mockLinearServer(t, func(query string, variables map[string]any) any {
+		if strings.Contains(query, "ListIssues") {
+			return map[string]any{
+				"data": map[string]any{
+					"issues": map[string]any{
+						"nodes": []any{
+							map[string]any{
+								"id":         "uuid-3",
+								"identifier": "ENG-3",
+								"title":      "Third (should be last)",
+								"priority":   float64(2),
+								"sortOrder":  float64(-100.0),
+								"createdAt":  "2025-01-15T09:00:00Z",
+								"updatedAt":  "2025-01-15T09:00:00Z",
+								"state":      map[string]any{"id": "s1", "name": "Todo"},
+								"labels":     map[string]any{"nodes": []any{}},
+							},
+							map[string]any{
+								"id":         "uuid-1",
+								"identifier": "ENG-1",
+								"title":      "First (should be first)",
+								"priority":   float64(2),
+								"sortOrder":  float64(-500.0),
+								"createdAt":  "2025-01-15T09:00:00Z",
+								"updatedAt":  "2025-01-15T09:00:00Z",
+								"state":      map[string]any{"id": "s1", "name": "Todo"},
+								"labels":     map[string]any{"nodes": []any{}},
+							},
+							map[string]any{
+								"id":         "uuid-2",
+								"identifier": "ENG-2",
+								"title":      "Second (should be second)",
+								"priority":   float64(2),
+								"sortOrder":  float64(-300.0),
+								"createdAt":  "2025-01-15T09:00:00Z",
+								"updatedAt":  "2025-01-15T09:00:00Z",
+								"state":      map[string]any{"id": "s1", "name": "Todo"},
+								"labels":     map[string]any{"nodes": []any{}},
+							},
+						},
+						"pageInfo": map[string]any{"hasNextPage": false},
+					},
+				},
+			}
+		}
+		return map[string]any{"data": map[string]any{}}
+	})
+	defer server.Close()
+
+	l := &Linear{
+		ctx:              context.Background(),
+		client:           server.Client(),
+		apiKey:           "test-key",
+		apiEndpoint:      server.URL,
+		connected:        true,
+		agentLabelPrefix: "agent",
+		reverseStatusMap: map[string]backend.Status{
+			"todo": backend.StatusTodo,
+		},
+		statusMap: map[backend.Status]string{
+			backend.StatusTodo: "Todo",
+		},
+	}
+
+	taskList, err := l.List(backend.TaskFilters{})
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+
+	if len(taskList.Tasks) != 3 {
+		t.Fatalf("expected 3 tasks, got %d", len(taskList.Tasks))
+	}
+
+	// Verify tasks are sorted by sortOrder (lowest first)
+	expected := []string{"ENG-1", "ENG-2", "ENG-3"}
+	for i, id := range expected {
+		if taskList.Tasks[i].ID != id {
+			t.Errorf("task[%d].ID = %s, want %s", i, taskList.Tasks[i].ID, id)
+		}
+	}
+}

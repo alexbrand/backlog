@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -220,6 +221,7 @@ func (l *Linear) List(filters backend.TaskFilters) (*backend.TaskList, error) {
 					title
 					description
 					priority
+					sortOrder
 					url
 					createdAt
 					updatedAt
@@ -361,6 +363,13 @@ func (l *Linear) List(filters backend.TaskFilters) (*backend.TaskList, error) {
 
 		tasks = append(tasks, *task)
 	}
+
+	// Sort by sortOrder (lower = higher on the board)
+	sort.Slice(tasks, func(i, j int) bool {
+		si, _ := tasks[i].Meta["sort_order"].(float64)
+		sj, _ := tasks[j].Meta["sort_order"].(float64)
+		return si < sj
+	})
 
 	// Apply limit after filtering
 	if filters.Limit > 0 && len(tasks) > filters.Limit {
@@ -1949,6 +1958,11 @@ func (l *Linear) issueToTask(issue map[string]any) *backend.Task {
 			}
 			task.Labels = labels
 		}
+	}
+
+	// Sort order (used for board position ordering)
+	if sortOrder, ok := issue["sortOrder"].(float64); ok {
+		task.Meta["sort_order"] = sortOrder
 	}
 
 	// Store Linear ID in meta
