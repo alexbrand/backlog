@@ -200,14 +200,17 @@ func (l *Local) List(filters backend.TaskFilters) (*backend.TaskList, error) {
 		}
 	}
 
-	// Sort by priority (urgent first) then by created (oldest first)
+	// Sort by priority (urgent first), then by created (oldest first), then by ID for deterministic order
 	sort.Slice(tasks, func(i, j int) bool {
 		pi := priorityOrder(tasks[i].Priority)
 		pj := priorityOrder(tasks[j].Priority)
 		if pi != pj {
 			return pi < pj
 		}
-		return tasks[i].Created.Before(tasks[j].Created)
+		if !tasks[i].Created.Equal(tasks[j].Created) {
+			return tasks[i].Created.Before(tasks[j].Created)
+		}
+		return tasks[i].ID < tasks[j].ID
 	})
 
 	// Apply limit

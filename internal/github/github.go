@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -304,6 +305,19 @@ func (g *GitHub) List(filters backend.TaskFilters) (*backend.TaskList, error) {
 
 		tasks = append(tasks, *task)
 	}
+
+	// Sort by priority (urgent first), then by created (oldest first), then by ID for deterministic order
+	sort.Slice(tasks, func(i, j int) bool {
+		pi := priorityOrder(tasks[i].Priority)
+		pj := priorityOrder(tasks[j].Priority)
+		if pi != pj {
+			return pi < pj
+		}
+		if !tasks[i].Created.Equal(tasks[j].Created) {
+			return tasks[i].Created.Before(tasks[j].Created)
+		}
+		return tasks[i].ID < tasks[j].ID
+	})
 
 	// Apply limit
 	hasMore := false
@@ -1035,4 +1049,22 @@ func Register() {
 	backend.Register(Name, func() backend.Backend {
 		return New()
 	})
+}
+
+// priorityOrder returns a numeric order for priorities (lower = higher priority).
+func priorityOrder(p backend.Priority) int {
+	switch p {
+	case backend.PriorityUrgent:
+		return 0
+	case backend.PriorityHigh:
+		return 1
+	case backend.PriorityMedium:
+		return 2
+	case backend.PriorityLow:
+		return 3
+	case backend.PriorityNone:
+		return 4
+	default:
+		return 5
+	}
 }

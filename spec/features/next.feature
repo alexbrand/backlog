@@ -98,3 +98,14 @@ Feature: Next Task
     When I run "backlog next --claim"
     Then the exit code should be 0
     And stdout should be empty
+
+  Scenario: Next returns oldest task when priorities are equal
+    Given a backlog with the following tasks:
+      | id    | title        | status | priority | assignee | labels   | agent_id |
+      | taskA | First task   | todo   | none     |          |          |          |
+      | taskB | Second task  | todo   | none     |          |          |          |
+      | taskC | Third task   | todo   | none     |          |          |          |
+    When I run "backlog next -f json"
+    Then the exit code should be 0
+    And the JSON output should have "id" equal to "taskA"
+    And the JSON output should have "title" equal to "First task"
