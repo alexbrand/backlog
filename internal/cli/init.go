@@ -3,13 +3,16 @@ package cli
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alexbrand/backlog/internal/credentials"
 	"github.com/alexbrand/backlog/internal/github"
@@ -23,7 +26,7 @@ var initCmd = &cobra.Command{
 	Long: `Initialize a new backlog in the current directory.
 
 This command creates the .backlog/ directory structure and guides you through
-configuring the backend (GitHub Issues or local filesystem).
+configuring the backend (GitHub Issues, Linear, or local filesystem).
 
 For GitHub backend, it will attempt to auto-detect:
   - Repository from git remote
@@ -71,7 +74,8 @@ func runInit() error {
 	// Choose backend
 	fmt.Println("Backend:")
 	fmt.Println("  1. GitHub Issues (sync with GitHub)")
-	fmt.Println("  2. Local filesystem (standalone)")
+	fmt.Println("  2. Linear (cloud-based project management)")
+	fmt.Println("  3. Local filesystem (standalone)")
 	fmt.Print("Choose [1]: ")
 	backendChoice, _ := reader.ReadString('\n')
 	backendChoice = strings.TrimSpace(backendChoice)
@@ -86,7 +90,10 @@ func runInit() error {
 	case "1", "github":
 		backendType = "github"
 		workspaceConfig = configureGitHubBackendInit(reader, detectedRepo)
-	case "2", "local":
+	case "2", "linear":
+		backendType = "linear"
+		workspaceConfig = configureLinearBackendInit(reader)
+	case "3", "local":
 		backendType = "local"
 		workspaceConfig = configureLocalBackendInit(reader)
 	default:
@@ -330,6 +337,133 @@ func configureLocalBackendInit(reader *bufio.Reader) map[string]any {
 	}
 
 	return config
+}
+
+// detectLinearToken checks for Linear API key from various sources.
+// Returns the token and a description of where it was found.
+func detectLinearToken() (token string, source string) {
+	// 1. Check LINEAR_API_KEY environment variable
+	if token := os.Getenv("LINEAR_API_KEY"); token != "" {
+		return token, "LINEAR_API_KEY environment variable"
+	}
+
+	// 2. Check credentials file
+	if err := credentials.Init(); err == nil {
+		if token, err := credentials.GetLinearAPIKey(); err == nil {
+			return token, "credentials file"
+		}
+	}
+
+	return "", ""
+}
+
+func configureLinearBackendInit(reader *bufio.Reader) map[string]any {
+	config := make(map[string]any)
+
+	fmt.Println()
+	fmt.Println("Linear Backend Setup:")
+
+	// Team key (required)
+	fmt.Print("  Team key (e.g. ENG): ")
+	teamKey, _ := reader.ReadString('\n')
+	teamKey = strings.TrimSpace(teamKey)
+	if teamKey != "" {
+		config["team"] = teamKey
+	}
+
+	// Check for Linear API key
+	token, tokenSource := detectLinearToken()
+	if token != "" {
+		fmt.Printf("  API key: Found via %s\n", tokenSource)
+
+		// If token came from env var, offer to save it to credentials file
+		if tokenSource == "LINEAR_API_KEY environment variable" {
+			fmt.Print("  Save API key to credentials file? [Y/n]: ")
+			saveChoice, _ := reader.ReadString('\n')
+			saveChoice = strings.TrimSpace(strings.ToLower(saveChoice))
+			if saveChoice == "" || saveChoice == "y" || saveChoice == "yes" {
+				if err := credentials.SaveLinearAPIKey(token); err != nil {
+					fmt.Printf("  Warning: failed to save API key: %v\n", err)
+				} else {
+					credPath, _ := credentials.DefaultCredentialsPath()
+					fmt.Printf("  API key saved to %s\n", credPath)
+				}
+			}
+		}
+
+		// Verify team if both token and team key are available
+		if teamKey != "" {
+			verifyLinearTeam(token, teamKey)
+		}
+	} else {
+		fmt.Println()
+		fmt.Println("  No Linear API key found.")
+		fmt.Println("  Options:")
+		fmt.Println("    - Set LINEAR_API_KEY environment variable")
+		fmt.Println("    - Add api_key to ~/.config/backlog/credentials.yaml under 'linear'")
+		fmt.Println("    - Create an API key at https://linear.app/settings/api")
+	}
+
+	// Optional: Agent ID
+	fmt.Print("  Agent ID (optional, press Enter to skip): ")
+	agentID, _ := reader.ReadString('\n')
+	agentID = strings.TrimSpace(agentID)
+	if agentID != "" {
+		config["agent_id"] = agentID
+	}
+
+	return config
+}
+
+// verifyLinearTeam verifies a Linear team key by calling the API.
+func verifyLinearTeam(apiKey, teamKey string) {
+	apiEndpoint := os.Getenv("LINEAR_API_URL")
+	if apiEndpoint == "" {
+		apiEndpoint = "https://api.linear.app/graphql"
+	}
+
+	query := `{"query":"query($key:String!){team(id:$key){id name key}}","variables":{"key":"` + teamKey + `"}}`
+
+	req, err := http.NewRequest("POST", apiEndpoint, strings.NewReader(query))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", apiKey)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Printf("  Warning: could not verify team: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		fmt.Printf("  Warning: could not verify team (HTTP %d)\n", resp.StatusCode)
+		return
+	}
+
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return
+	}
+
+	data, ok := result["data"].(map[string]any)
+	if !ok {
+		return
+	}
+
+	team, ok := data["team"].(map[string]any)
+	if !ok || team == nil {
+		fmt.Printf("  Warning: team '%s' not found\n", teamKey)
+		return
+	}
+
+	teamName, _ := team["name"].(string)
+	if teamName != "" {
+		fmt.Printf("  Team verified: %s (%s)\n", teamName, teamKey)
+	}
 }
 
 // configureGitHubProject handles the GitHub Projects setup during init.
