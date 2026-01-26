@@ -222,6 +222,7 @@ func (l *Linear) List(filters backend.TaskFilters) (*backend.TaskList, error) {
 					description
 					priority
 					sortOrder
+					prioritySortOrder
 					url
 					createdAt
 					updatedAt
@@ -365,12 +366,18 @@ func (l *Linear) List(filters backend.TaskFilters) (*backend.TaskList, error) {
 	}
 
 	// Sort by priority first (urgent > high > medium > low > none),
-	// then by sortOrder ascending within each priority group (lower = top of board).
+	// then by prioritySortOrder ascending within each priority group (lower = top of board).
+	// Falls back to sortOrder if prioritySortOrder is not set.
 	sort.Slice(tasks, func(i, j int) bool {
 		pi := linearPriorityOrder(tasks[i].Priority)
 		pj := linearPriorityOrder(tasks[j].Priority)
 		if pi != pj {
 			return pi < pj
+		}
+		psoi, _ := tasks[i].Meta["priority_sort_order"].(float64)
+		psoj, _ := tasks[j].Meta["priority_sort_order"].(float64)
+		if psoi != 0 || psoj != 0 {
+			return psoi < psoj
 		}
 		return tasks[i].SortOrder < tasks[j].SortOrder
 	})
@@ -1975,6 +1982,11 @@ func (l *Linear) issueToTask(issue map[string]any) *backend.Task {
 		task.Meta["sort_order"] = sortOrder
 	}
 
+	// Priority sort order (used for ordering within priority groups in Linear)
+	if prioritySortOrder, ok := issue["prioritySortOrder"].(float64); ok {
+		task.Meta["priority_sort_order"] = prioritySortOrder
+	}
+
 	// Store Linear ID in meta
 	task.Meta["linear_id"] = getString(issue, "id")
 	task.Meta["identifier"] = getString(issue, "identifier")
@@ -2068,6 +2080,7 @@ func (l *Linear) Reorder(id string, position backend.ReorderPosition) (*backend.
 					description
 					priority
 					sortOrder
+					prioritySortOrder
 					url
 					createdAt
 					updatedAt
@@ -2097,7 +2110,7 @@ func (l *Linear) Reorder(id string, position backend.ReorderPosition) (*backend.
 
 	result, err := l.graphQL(mutation, map[string]any{
 		"id":    linearID,
-		"input": map[string]any{"sortOrder": newOrder},
+		"input": map[string]any{"sortOrder": newOrder, "prioritySortOrder": newOrder},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to reorder issue: %w", err)
@@ -2127,13 +2140,14 @@ func (l *Linear) Reorder(id string, position backend.ReorderPosition) (*backend.
 }
 
 // calculateLinearSortOrder computes the new sortOrder value for a Linear issue.
-// Linear sorts ascending: lower sortOrder = top of the board column.
+// It uses prioritySortOrder (which controls ordering within priority groups in Linear)
+// with a fallback to sortOrder. Lower values = top of the board column.
 // The sortedTasks slice is in ascending order (index 0 = top/first).
 func calculateLinearSortOrder(target *backend.Task, sortedTasks []backend.Task, position backend.ReorderPosition, l *Linear) (float64, error) {
-	// Build a list of tasks excluding the target (already in ascending order)
+	// Build a list of tasks in the same priority group, excluding the target (already in ascending order)
 	others := make([]backend.Task, 0, len(sortedTasks))
 	for _, t := range sortedTasks {
-		if t.ID != target.ID {
+		if t.ID != target.ID && t.Priority == target.Priority {
 			others = append(others, t)
 		}
 	}
@@ -2143,7 +2157,7 @@ func calculateLinearSortOrder(target *backend.Task, sortedTasks []backend.Task, 
 			return 1024, nil
 		}
 		// Lower than the current top task
-		return others[0].SortOrder - 1024, nil
+		return effectiveSortOrder(others[0]) - 1024, nil
 	}
 
 	if position.Last {
@@ -2151,7 +2165,7 @@ func calculateLinearSortOrder(target *backend.Task, sortedTasks []backend.Task, 
 			return 1024, nil
 		}
 		// Higher than the current bottom task
-		return others[len(others)-1].SortOrder + 1024, nil
+		return effectiveSortOrder(others[len(others)-1]) + 1024, nil
 	}
 
 	refID := position.BeforeID
@@ -2175,16 +2189,24 @@ func calculateLinearSortOrder(target *backend.Task, sortedTasks []backend.Task, 
 	if position.BeforeID != "" {
 		// "Before" = visually above = lower sortOrder than reference
 		if refIdx == 0 {
-			return others[0].SortOrder - 1024, nil
+			return effectiveSortOrder(others[0]) - 1024, nil
 		}
-		return (others[refIdx-1].SortOrder + others[refIdx].SortOrder) / 2, nil
+		return (effectiveSortOrder(others[refIdx-1]) + effectiveSortOrder(others[refIdx])) / 2, nil
 	}
 
 	// AfterID: "After" = visually below = higher sortOrder than reference
 	if refIdx == len(others)-1 {
-		return others[refIdx].SortOrder + 1024, nil
+		return effectiveSortOrder(others[refIdx]) + 1024, nil
 	}
-	return (others[refIdx].SortOrder + others[refIdx+1].SortOrder) / 2, nil
+	return (effectiveSortOrder(others[refIdx]) + effectiveSortOrder(others[refIdx+1])) / 2, nil
+}
+
+// effectiveSortOrder returns the prioritySortOrder if set, otherwise falls back to sortOrder.
+func effectiveSortOrder(t backend.Task) float64 {
+	if pso, ok := t.Meta["priority_sort_order"].(float64); ok && pso != 0 {
+		return pso
+	}
+	return t.SortOrder
 }
 
 func linearPriorityOrder(p backend.Priority) int {
