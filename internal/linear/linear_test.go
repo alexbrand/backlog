@@ -998,8 +998,8 @@ func TestListSortsBySortOrder(t *testing.T) {
 		t.Fatalf("expected 3 tasks, got %d", len(taskList.Tasks))
 	}
 
-	// Verify tasks are sorted by sortOrder descending (highest first = top of board)
-	expected := []string{"ENG-3", "ENG-2", "ENG-1"}
+	// Verify tasks are sorted by sortOrder ascending (lowest first = top of board)
+	expected := []string{"ENG-1", "ENG-2", "ENG-3"}
 	for i, id := range expected {
 		if taskList.Tasks[i].ID != id {
 			t.Errorf("task[%d].ID = %s, want %s", i, taskList.Tasks[i].ID, id)
