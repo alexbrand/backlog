@@ -213,7 +213,7 @@ func (l *Linear) List(filters backend.TaskFilters) (*backend.TaskList, error) {
 
 	// Build GraphQL query with filters
 	query := `
-		query ListIssues($teamId: String, $first: Int, $filter: IssueFilter) {
+		query ListIssues($first: Int, $filter: IssueFilter) {
 			issues(first: $first, filter: $filter) {
 				nodes {
 					id
