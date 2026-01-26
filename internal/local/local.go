@@ -200,12 +200,26 @@ func (l *Local) List(filters backend.TaskFilters) (*backend.TaskList, error) {
 		}
 	}
 
-	// Sort by priority (urgent first), then by created (oldest first), then by ID for deterministic order
+	// Sort by priority (urgent first), then by sort_order if set, then by created (oldest first),
+	// then by ID for deterministic order
 	sort.Slice(tasks, func(i, j int) bool {
 		pi := priorityOrder(tasks[i].Priority)
 		pj := priorityOrder(tasks[j].Priority)
 		if pi != pj {
 			return pi < pj
+		}
+		// Within same priority, use sort_order if either task has one
+		if tasks[i].SortOrder != 0 || tasks[j].SortOrder != 0 {
+			if tasks[i].SortOrder != tasks[j].SortOrder {
+				// Tasks without sort_order (0) sort after tasks with sort_order
+				if tasks[i].SortOrder == 0 {
+					return false
+				}
+				if tasks[j].SortOrder == 0 {
+					return true
+				}
+				return tasks[i].SortOrder < tasks[j].SortOrder
+			}
 		}
 		if !tasks[i].Created.Equal(tasks[j].Created) {
 			return tasks[i].Created.Before(tasks[j].Created)
@@ -1095,6 +1109,199 @@ func (l *Local) releaseWithFileLock(id string) error {
 	}
 
 	return nil
+}
+
+// Reorder changes the sort position of a task within its status and priority group.
+// Implements the backend.Reorderer interface.
+func (l *Local) Reorder(id string, position backend.ReorderPosition) (*backend.Task, error) {
+	if !l.connected {
+		return nil, errors.New("not connected")
+	}
+
+	// Find the target task
+	task, err := l.findTask(id)
+	if err != nil {
+		return nil, err
+	}
+
+	// List tasks with the same status and priority to determine neighbors
+	filters := backend.TaskFilters{
+		Status:      []backend.Status{task.Status},
+		Priority:    []backend.Priority{task.Priority},
+		IncludeDone: task.Status == backend.StatusDone,
+	}
+	taskList, err := l.List(filters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list tasks for reordering: %w", err)
+	}
+
+	// Validate that reference task (--before/--after) has the same status and priority
+	if position.BeforeID != "" || position.AfterID != "" {
+		refID := position.BeforeID
+		if refID == "" {
+			refID = position.AfterID
+		}
+		if refID == id {
+			return nil, fmt.Errorf("cannot reorder task relative to itself")
+		}
+		found := false
+		for _, t := range taskList.Tasks {
+			if t.ID == refID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			// Check if the reference task exists at all
+			_, refErr := l.findTask(refID)
+			if refErr != nil {
+				return nil, fmt.Errorf("reference task does not exist: %s", refID)
+			}
+			return nil, fmt.Errorf("reference task %s has different status or priority than task %s", refID, id)
+		}
+	}
+
+	// Assign default sort_order values to tasks that don't have one.
+	// We need to persist these to all tasks in the group so that sorting is consistent.
+	needsPersist := ensureSortOrders(taskList.Tasks)
+
+	// Calculate the new sort_order based on position
+	newOrder, err := calculateSortOrder(id, taskList.Tasks, position)
+	if err != nil {
+		return nil, err
+	}
+
+	// Persist sort_order for all tasks that were assigned default values
+	now := time.Now().UTC()
+	for _, t := range needsPersist {
+		if t.ID == id {
+			continue // We'll write the target task separately with the new order
+		}
+		peer, err := l.findTask(t.ID)
+		if err != nil {
+			continue
+		}
+		peer.SortOrder = t.SortOrder
+		peer.Updated = now
+		if err := l.writeTask(peer); err != nil {
+			return nil, fmt.Errorf("failed to write task %s: %w", t.ID, err)
+		}
+	}
+
+	// Update the target task's sort_order
+	task.SortOrder = newOrder
+	task.Updated = now
+
+	if err := l.writeTask(task); err != nil {
+		return nil, fmt.Errorf("failed to write task: %w", err)
+	}
+
+	// Git commit if enabled
+	if err := l.gitCommit("reorder", id); err != nil {
+		return nil, fmt.Errorf("failed to commit: %w", err)
+	}
+
+	return task, nil
+}
+
+// Sort order spacing constants.
+const (
+	// sortOrderGap is the spacing between sort_order values.
+	sortOrderGap = 1024.0
+	// sortOrderBase is the starting offset for default sort_order values.
+	// This is set high enough that multiple --first operations won't reach 0
+	// (which is the zero value and means "no explicit ordering").
+	sortOrderBase = 65536.0
+)
+
+// ensureSortOrders assigns default sort_order values to tasks that don't have one.
+// Tasks are assumed to already be sorted by the desired default order.
+// Returns the tasks that were assigned new sort_order values (need persisting).
+func ensureSortOrders(tasks []backend.Task) []backend.Task {
+	hasUnset := false
+	for _, t := range tasks {
+		if t.SortOrder == 0 {
+			hasUnset = true
+			break
+		}
+	}
+	if !hasUnset {
+		return nil
+	}
+
+	var updated []backend.Task
+	for i := range tasks {
+		if tasks[i].SortOrder == 0 {
+			tasks[i].SortOrder = sortOrderBase + float64(i)*sortOrderGap
+			updated = append(updated, tasks[i])
+		}
+	}
+	return updated
+}
+
+// calculateSortOrder computes the new sort_order value based on the position.
+func calculateSortOrder(targetID string, sortedTasks []backend.Task, position backend.ReorderPosition) (float64, error) {
+	// Build a list of tasks excluding the target
+	others := make([]backend.Task, 0, len(sortedTasks))
+	for _, t := range sortedTasks {
+		if t.ID != targetID {
+			others = append(others, t)
+		}
+	}
+
+	if position.First {
+		if len(others) == 0 {
+			return 1024, nil
+		}
+		return others[0].SortOrder - 1024, nil
+	}
+
+	if position.Last {
+		if len(others) == 0 {
+			return 1024, nil
+		}
+		return others[len(others)-1].SortOrder + 1024, nil
+	}
+
+	if position.BeforeID != "" {
+		return calculateBeforeOrder(others, position.BeforeID)
+	}
+
+	if position.AfterID != "" {
+		return calculateAfterOrder(others, position.AfterID)
+	}
+
+	return 0, fmt.Errorf("no position specified")
+}
+
+// calculateBeforeOrder computes a sort_order that places the task before the reference task.
+func calculateBeforeOrder(others []backend.Task, beforeID string) (float64, error) {
+	for i, t := range others {
+		if t.ID == beforeID {
+			if i == 0 {
+				// Inserting before the first task
+				return t.SortOrder - 1024, nil
+			}
+			// Midpoint between predecessor and this task
+			return (others[i-1].SortOrder + t.SortOrder) / 2, nil
+		}
+	}
+	return 0, fmt.Errorf("reference task not found: %s", beforeID)
+}
+
+// calculateAfterOrder computes a sort_order that places the task after the reference task.
+func calculateAfterOrder(others []backend.Task, afterID string) (float64, error) {
+	for i, t := range others {
+		if t.ID == afterID {
+			if i == len(others)-1 {
+				// Inserting after the last task
+				return t.SortOrder + 1024, nil
+			}
+			// Midpoint between this task and successor
+			return (t.SortOrder + others[i+1].SortOrder) / 2, nil
+		}
+	}
+	return 0, fmt.Errorf("reference task not found: %s", afterID)
 }
 
 // findAgentLabels returns all labels that match the agent label pattern.

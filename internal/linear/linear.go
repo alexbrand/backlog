@@ -366,9 +366,7 @@ func (l *Linear) List(filters backend.TaskFilters) (*backend.TaskList, error) {
 
 	// Sort by sortOrder (lower = higher on the board)
 	sort.Slice(tasks, func(i, j int) bool {
-		si, _ := tasks[i].Meta["sort_order"].(float64)
-		sj, _ := tasks[j].Meta["sort_order"].(float64)
-		return si < sj
+		return tasks[i].SortOrder < tasks[j].SortOrder
 	})
 
 	// Apply limit after filtering
@@ -1967,6 +1965,7 @@ func (l *Linear) issueToTask(issue map[string]any) *backend.Task {
 
 	// Sort order (used for board position ordering)
 	if sortOrder, ok := issue["sortOrder"].(float64); ok {
+		task.SortOrder = sortOrder
 		task.Meta["sort_order"] = sortOrder
 	}
 
@@ -1989,6 +1988,193 @@ func getString(m map[string]any, key string) string {
 		return v
 	}
 	return ""
+}
+
+// Reorder changes the sort position of an issue in Linear.
+// Implements the backend.Reorderer interface.
+func (l *Linear) Reorder(id string, position backend.ReorderPosition) (*backend.Task, error) {
+	if !l.connected {
+		return nil, errors.New("not connected")
+	}
+
+	issueID := l.normalizeID(id)
+
+	// Get the current issue
+	issue, err := l.getIssueByIdentifier(issueID)
+	if err != nil {
+		return nil, err
+	}
+
+	linearID, ok := issue["id"].(string)
+	if !ok {
+		return nil, errors.New("failed to get issue ID")
+	}
+
+	task := l.issueToTask(issue)
+
+	// List all tasks with the same status to find neighbors
+	filters := backend.TaskFilters{
+		Status:      []backend.Status{task.Status},
+		IncludeDone: task.Status == backend.StatusDone,
+	}
+	taskList, err := l.List(filters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list issues for reordering: %w", err)
+	}
+
+	// Validate reference task if using --before/--after
+	if position.BeforeID != "" || position.AfterID != "" {
+		refID := position.BeforeID
+		if refID == "" {
+			refID = position.AfterID
+		}
+		normalizedRefID := l.normalizeID(refID)
+		if normalizedRefID == issueID {
+			return nil, fmt.Errorf("cannot reorder task relative to itself")
+		}
+		found := false
+		for _, t := range taskList.Tasks {
+			if t.ID == refID || l.normalizeID(t.ID) == normalizedRefID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("reference task %s not found in the same status", refID)
+		}
+	}
+
+	// Calculate the new sort order
+	newOrder, err := calculateLinearSortOrder(task, taskList.Tasks, position, l)
+	if err != nil {
+		return nil, err
+	}
+
+	// Use issueUpdate mutation to set the new sortOrder
+	mutation := `
+		mutation ReorderIssue($id: String!, $input: IssueUpdateInput!) {
+			issueUpdate(id: $id, input: $input) {
+				success
+				issue {
+					id
+					identifier
+					title
+					description
+					priority
+					sortOrder
+					url
+					createdAt
+					updatedAt
+					state {
+						id
+						name
+					}
+					assignee {
+						id
+						name
+						displayName
+					}
+					labels {
+						nodes {
+							id
+							name
+						}
+					}
+					team {
+						id
+						key
+					}
+				}
+			}
+		}
+	`
+
+	result, err := l.graphQL(mutation, map[string]any{
+		"id":    linearID,
+		"input": map[string]any{"sortOrder": newOrder},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to reorder issue: %w", err)
+	}
+
+	data, ok := result["data"].(map[string]any)
+	if !ok {
+		return nil, errors.New("unexpected response format")
+	}
+
+	updateResult, ok := data["issueUpdate"].(map[string]any)
+	if !ok {
+		return nil, errors.New("unexpected response format: missing issueUpdate")
+	}
+
+	success, _ := updateResult["success"].(bool)
+	if !success {
+		return nil, errors.New("failed to reorder issue")
+	}
+
+	updatedIssue, ok := updateResult["issue"].(map[string]any)
+	if !ok {
+		return nil, errors.New("unexpected response format: missing issue")
+	}
+
+	return l.issueToTask(updatedIssue), nil
+}
+
+// calculateLinearSortOrder computes the new sortOrder value for a Linear issue.
+// Linear uses sortOrder as the primary sort (not within priority groups).
+func calculateLinearSortOrder(target *backend.Task, sortedTasks []backend.Task, position backend.ReorderPosition, l *Linear) (float64, error) {
+	// Build a list of tasks excluding the target
+	others := make([]backend.Task, 0, len(sortedTasks))
+	for _, t := range sortedTasks {
+		if t.ID != target.ID {
+			others = append(others, t)
+		}
+	}
+
+	if position.First {
+		if len(others) == 0 {
+			return 1024, nil
+		}
+		return others[0].SortOrder - 1024, nil
+	}
+
+	if position.Last {
+		if len(others) == 0 {
+			return 1024, nil
+		}
+		return others[len(others)-1].SortOrder + 1024, nil
+	}
+
+	refID := position.BeforeID
+	if refID == "" {
+		refID = position.AfterID
+	}
+
+	// Find the reference task, matching by normalized ID
+	normalizedRef := l.normalizeID(refID)
+	refIdx := -1
+	for i, t := range others {
+		if t.ID == refID || l.normalizeID(t.ID) == normalizedRef {
+			refIdx = i
+			break
+		}
+	}
+	if refIdx == -1 {
+		return 0, fmt.Errorf("reference task not found: %s", refID)
+	}
+
+	if position.BeforeID != "" {
+		if refIdx == 0 {
+			return others[0].SortOrder - 1024, nil
+		}
+		return (others[refIdx-1].SortOrder + others[refIdx].SortOrder) / 2, nil
+	}
+
+	// AfterID
+	if refIdx == len(others)-1 {
+		return others[refIdx].SortOrder + 1024, nil
+	}
+	return (others[refIdx].SortOrder + others[refIdx+1].SortOrder) / 2, nil
 }
 
 // ClaimConflictError represents an error when a task is already claimed by another agent.

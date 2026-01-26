@@ -79,6 +79,9 @@ type Formatter interface {
 
 	// FormatDeleted outputs the result of deleting a task.
 	FormatDeleted(w io.Writer, id string) error
+
+	// FormatReordered outputs the result of reordering a task.
+	FormatReordered(w io.Writer, task *backend.Task) error
 }
 
 // New creates a formatter for the specified format.

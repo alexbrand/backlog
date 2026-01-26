@@ -224,3 +224,9 @@ func (f *TableFormatter) FormatDeleted(w io.Writer, id string) error {
 	fmt.Fprintf(w, "Deleted %s\n", id)
 	return nil
 }
+
+// FormatReordered outputs the result of reordering a task.
+func (f *TableFormatter) FormatReordered(w io.Writer, task *backend.Task) error {
+	fmt.Fprintf(w, "Reordered %s: %s\n", task.ID, task.Title)
+	return nil
+}

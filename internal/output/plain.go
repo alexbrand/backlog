@@ -146,3 +146,9 @@ func (f *PlainFormatter) FormatDeleted(w io.Writer, id string) error {
 	fmt.Fprintln(w, id)
 	return nil
 }
+
+// FormatReordered outputs the result of reordering a task in plain format.
+func (f *PlainFormatter) FormatReordered(w io.Writer, task *backend.Task) error {
+	fmt.Fprintln(w, task.ID)
+	return nil
+}

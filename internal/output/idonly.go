@@ -105,3 +105,9 @@ func (f *IDOnlyFormatter) FormatDeleted(w io.Writer, id string) error {
 	fmt.Fprintln(w, id)
 	return nil
 }
+
+// FormatReordered outputs only the reordered task ID.
+func (f *IDOnlyFormatter) FormatReordered(w io.Writer, task *backend.Task) error {
+	fmt.Fprintln(w, task.ID)
+	return nil
+}

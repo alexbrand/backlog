@@ -174,6 +174,17 @@ func (f *JSONFormatter) FormatDeleted(w io.Writer, id string) error {
 	})
 }
 
+// FormatReordered outputs the result of reordering a task as JSON.
+func (f *JSONFormatter) FormatReordered(w io.Writer, task *backend.Task) error {
+	return f.writeJSON(w, map[string]any{
+		"id":         task.ID,
+		"title":      task.Title,
+		"status":     task.Status,
+		"priority":   task.Priority,
+		"sort_order": task.SortOrder,
+	})
+}
+
 // writeJSON encodes the value as indented JSON and writes it to w.
 func (f *JSONFormatter) writeJSON(w io.Writer, v any) error {
 	enc := json.NewEncoder(w)

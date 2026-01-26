@@ -88,6 +88,10 @@ type Task struct {
 	// URL is the web URL to view the task in a browser.
 	URL string `json:"url,omitempty" yaml:"url,omitempty"`
 
+	// SortOrder is the explicit sort position of the task (lower = higher in list).
+	// Zero value means no explicit ordering has been set.
+	SortOrder float64 `json:"sort_order,omitempty" yaml:"sort_order,omitempty"`
+
 	// Meta contains backend-specific fields.
 	Meta map[string]any `json:"meta,omitempty" yaml:"meta,omitempty"`
 }
@@ -295,4 +299,27 @@ type Claimer interface {
 type Syncer interface {
 	// Sync synchronizes local state with remote.
 	Sync(force bool) (*SyncResult, error)
+}
+
+// ReorderPosition specifies where to place a task in the sort order.
+// Exactly one field should be set.
+type ReorderPosition struct {
+	// BeforeID places the task immediately before the task with this ID.
+	BeforeID string
+
+	// AfterID places the task immediately after the task with this ID.
+	AfterID string
+
+	// First moves the task to the top of its group.
+	First bool
+
+	// Last moves the task to the bottom of its group.
+	Last bool
+}
+
+// Reorderer is an optional interface for backends that support explicit task reordering.
+type Reorderer interface {
+	// Reorder changes the sort position of a task.
+	// Returns the updated task with its new SortOrder.
+	Reorder(id string, position ReorderPosition) (*Task, error)
 }

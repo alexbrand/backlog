@@ -16,13 +16,14 @@ import (
 
 // taskFrontmatter represents the YAML frontmatter of a task file.
 type taskFrontmatter struct {
-	ID       string          `yaml:"id"`
-	Title    string          `yaml:"title"`
-	Priority backend.Priority `yaml:"priority,omitempty"`
-	Assignee string          `yaml:"assignee,omitempty"`
-	Labels   []string        `yaml:"labels,omitempty"`
-	Created  time.Time       `yaml:"created"`
-	Updated  time.Time       `yaml:"updated"`
+	ID        string           `yaml:"id"`
+	Title     string           `yaml:"title"`
+	Priority  backend.Priority `yaml:"priority,omitempty"`
+	Assignee  string           `yaml:"assignee,omitempty"`
+	Labels    []string         `yaml:"labels,omitempty"`
+	SortOrder float64          `yaml:"sort_order,omitempty"`
+	Created   time.Time        `yaml:"created"`
+	Updated   time.Time        `yaml:"updated"`
 }
 
 // readTaskFile reads a task from a markdown file with YAML frontmatter.
@@ -53,6 +54,7 @@ func (l *Local) readTaskFile(filePath string, status backend.Status) (*backend.T
 		Priority:    fm.Priority,
 		Assignee:    fm.Assignee,
 		Labels:      fm.Labels,
+		SortOrder:   fm.SortOrder,
 		Created:     fm.Created,
 		Updated:     fm.Updated,
 	}
@@ -85,13 +87,14 @@ func (l *Local) writeTask(task *backend.Task) error {
 
 	// Build frontmatter
 	fm := taskFrontmatter{
-		ID:       task.ID,
-		Title:    task.Title,
-		Priority: task.Priority,
-		Assignee: task.Assignee,
-		Labels:   task.Labels,
-		Created:  task.Created,
-		Updated:  task.Updated,
+		ID:        task.ID,
+		Title:     task.Title,
+		Priority:  task.Priority,
+		Assignee:  task.Assignee,
+		Labels:    task.Labels,
+		SortOrder: task.SortOrder,
+		Created:   task.Created,
+		Updated:   task.Updated,
 	}
 
 	frontmatterBytes, err := yaml.Marshal(&fm)
