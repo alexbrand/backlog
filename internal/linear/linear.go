@@ -1639,6 +1639,11 @@ func (l *Linear) getStateIDForStatus(status backend.Status) (string, error) {
 		}
 		t := getString(state, "type")
 		if strings.EqualFold(t, stateType) {
+			fallbackName := getString(state, "name")
+			// Check if the fallback state maps back to a different canonical status
+			if mappedStatus, ok := l.reverseStatusMap[strings.ToLower(fallbackName)]; ok && mappedStatus != status {
+				return "", fmt.Errorf("no %q workflow state found in Linear (expected %q); the closest match %q maps to %q instead. Add an %q state in your Linear team's workflow settings", status, stateName, fallbackName, mappedStatus, stateName)
+			}
 			return getString(state, "id"), nil
 		}
 	}
