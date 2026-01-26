@@ -364,9 +364,9 @@ func (l *Linear) List(filters backend.TaskFilters) (*backend.TaskList, error) {
 		tasks = append(tasks, *task)
 	}
 
-	// Sort by sortOrder (lower = higher on the board)
+	// Sort by sortOrder descending (higher = top of the board in Linear)
 	sort.Slice(tasks, func(i, j int) bool {
-		return tasks[i].SortOrder < tasks[j].SortOrder
+		return tasks[i].SortOrder > tasks[j].SortOrder
 	})
 
 	// Apply limit after filtering
@@ -2121,9 +2121,10 @@ func (l *Linear) Reorder(id string, position backend.ReorderPosition) (*backend.
 }
 
 // calculateLinearSortOrder computes the new sortOrder value for a Linear issue.
-// Linear uses sortOrder as the primary sort (not within priority groups).
+// Linear sorts descending: higher sortOrder = top of the board column.
+// The sortedTasks slice is in descending order (index 0 = top/first).
 func calculateLinearSortOrder(target *backend.Task, sortedTasks []backend.Task, position backend.ReorderPosition, l *Linear) (float64, error) {
-	// Build a list of tasks excluding the target
+	// Build a list of tasks excluding the target (already in descending order)
 	others := make([]backend.Task, 0, len(sortedTasks))
 	for _, t := range sortedTasks {
 		if t.ID != target.ID {
@@ -2135,14 +2136,16 @@ func calculateLinearSortOrder(target *backend.Task, sortedTasks []backend.Task, 
 		if len(others) == 0 {
 			return 1024, nil
 		}
-		return others[0].SortOrder - 1024, nil
+		// Higher than the current top task
+		return others[0].SortOrder + 1024, nil
 	}
 
 	if position.Last {
 		if len(others) == 0 {
 			return 1024, nil
 		}
-		return others[len(others)-1].SortOrder + 1024, nil
+		// Lower than the current bottom task
+		return others[len(others)-1].SortOrder - 1024, nil
 	}
 
 	refID := position.BeforeID
@@ -2164,15 +2167,16 @@ func calculateLinearSortOrder(target *backend.Task, sortedTasks []backend.Task, 
 	}
 
 	if position.BeforeID != "" {
+		// "Before" = visually above = higher sortOrder than reference
 		if refIdx == 0 {
-			return others[0].SortOrder - 1024, nil
+			return others[0].SortOrder + 1024, nil
 		}
 		return (others[refIdx-1].SortOrder + others[refIdx].SortOrder) / 2, nil
 	}
 
-	// AfterID
+	// AfterID: "After" = visually below = lower sortOrder than reference
 	if refIdx == len(others)-1 {
-		return others[refIdx].SortOrder + 1024, nil
+		return others[refIdx].SortOrder - 1024, nil
 	}
 	return (others[refIdx].SortOrder + others[refIdx+1].SortOrder) / 2, nil
 }
