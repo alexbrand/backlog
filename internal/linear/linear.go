@@ -1569,7 +1569,7 @@ func (l *Linear) getStateIDForStatus(status backend.Status) (string, error) {
 	}
 
 	query := `
-		query GetWorkflowStates($teamId: String) {
+		query GetWorkflowStates($teamId: ID) {
 			workflowStates(filter: { team: { id: { eq: $teamId } } }) {
 				nodes {
 					id
@@ -1782,7 +1782,7 @@ func (l *Linear) getLabelIDs(names []string) ([]string, error) {
 	}
 
 	query := `
-		query GetLabels($teamId: String) {
+		query GetLabels($teamId: ID) {
 			issueLabels(filter: { team: { id: { eq: $teamId } } }) {
 				nodes {
 					id
