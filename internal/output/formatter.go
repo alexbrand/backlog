@@ -82,6 +82,12 @@ type Formatter interface {
 
 	// FormatReordered outputs the result of reordering a task.
 	FormatReordered(w io.Writer, task *backend.Task) error
+
+	// FormatLinked outputs the result of linking two tasks.
+	FormatLinked(w io.Writer, relation *backend.Relation, sourceID string) error
+
+	// FormatUnlinked outputs the result of unlinking two tasks.
+	FormatUnlinked(w io.Writer, sourceID, targetID string) error
 }
 
 // New creates a formatter for the specified format.

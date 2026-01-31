@@ -15,6 +15,8 @@ var (
 	addDescription string
 	addBodyFile    string
 	addStatus      string
+	addBlocks      []string
+	addBlockedBy   []string
 )
 
 var addCmd = &cobra.Command{
@@ -44,6 +46,8 @@ func init() {
 	addCmd.Flags().StringVarP(&addDescription, "description", "d", "", "Task description")
 	addCmd.Flags().StringVar(&addBodyFile, "body-file", "", "Read description from file")
 	addCmd.Flags().StringVarP(&addStatus, "status", "s", "", "Initial status: backlog, todo, in-progress, review, done (default: backlog)")
+	addCmd.Flags().StringSliceVar(&addBlocks, "blocks", nil, "Task IDs that this task blocks")
+	addCmd.Flags().StringSliceVar(&addBlockedBy, "blocked-by", nil, "Task IDs that block this task")
 }
 
 func runAdd(title string) error {
@@ -99,6 +103,24 @@ func runAdd(title string) error {
 	task, err := b.Create(input)
 	if err != nil {
 		return fmt.Errorf("failed to create task: %w", err)
+	}
+
+	// Create dependency links if specified
+	if len(addBlocks) > 0 || len(addBlockedBy) > 0 {
+		relater, ok := b.(backend.Relater)
+		if !ok {
+			return fmt.Errorf("backend %q does not support task dependencies", b.Name())
+		}
+		for _, targetID := range addBlocks {
+			if _, err := relater.Link(task.ID, targetID, backend.RelationBlocks); err != nil {
+				return fmt.Errorf("failed to link %s --blocks %s: %w", task.ID, targetID, err)
+			}
+		}
+		for _, targetID := range addBlockedBy {
+			if _, err := relater.Link(task.ID, targetID, backend.RelationBlockedBy); err != nil {
+				return fmt.Errorf("failed to link %s --blocked-by %s: %w", task.ID, targetID, err)
+			}
+		}
 	}
 
 	// Output the result (unless quiet mode is enabled)

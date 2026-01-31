@@ -1304,6 +1304,215 @@ func calculateAfterOrder(others []backend.Task, afterID string) (float64, error)
 	return 0, fmt.Errorf("reference task not found: %s", afterID)
 }
 
+// Link creates a dependency relationship between two tasks.
+// Implements the backend.Relater interface.
+func (l *Local) Link(sourceID, targetID string, relationType backend.RelationType) (*backend.Relation, error) {
+	if !l.connected {
+		return nil, errors.New("not connected")
+	}
+
+	// Load both tasks
+	source, err := l.findTask(sourceID)
+	if err != nil {
+		return nil, err
+	}
+	target, err := l.findTask(targetID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize meta if needed
+	if source.Meta == nil {
+		source.Meta = make(map[string]any)
+	}
+	if target.Meta == nil {
+		target.Meta = make(map[string]any)
+	}
+
+	// Determine which lists to update
+	var sourceKey, targetKey string
+	if relationType == backend.RelationBlocks {
+		sourceKey = "blocks"
+		targetKey = "blocked_by"
+	} else {
+		sourceKey = "blocked_by"
+		targetKey = "blocks"
+	}
+
+	// Add to source's list
+	sourceList := metaStringSlice(source.Meta, sourceKey)
+	if !containsString(sourceList, targetID) {
+		sourceList = append(sourceList, targetID)
+		source.Meta[sourceKey] = sourceList
+	}
+
+	// Add to target's list (inverse)
+	targetList := metaStringSlice(target.Meta, targetKey)
+	if !containsString(targetList, sourceID) {
+		targetList = append(targetList, sourceID)
+		target.Meta[targetKey] = targetList
+	}
+
+	now := time.Now().UTC()
+	source.Updated = now
+	target.Updated = now
+
+	if err := l.writeTask(source); err != nil {
+		return nil, fmt.Errorf("failed to write source task: %w", err)
+	}
+	if err := l.writeTask(target); err != nil {
+		return nil, fmt.Errorf("failed to write target task: %w", err)
+	}
+
+	// Git commit if enabled
+	if err := l.gitCommit("link", sourceID); err != nil {
+		return nil, fmt.Errorf("failed to commit: %w", err)
+	}
+
+	return &backend.Relation{
+		Type:       relationType,
+		TaskID:     targetID,
+		TaskTitle:  target.Title,
+		TaskStatus: target.Status,
+	}, nil
+}
+
+// Unlink removes a dependency relationship between two tasks.
+// Implements the backend.Relater interface.
+func (l *Local) Unlink(sourceID, targetID string, relationType backend.RelationType) error {
+	if !l.connected {
+		return errors.New("not connected")
+	}
+
+	// Load both tasks
+	source, err := l.findTask(sourceID)
+	if err != nil {
+		return err
+	}
+	target, err := l.findTask(targetID)
+	if err != nil {
+		return err
+	}
+
+	// Initialize meta if needed
+	if source.Meta == nil {
+		source.Meta = make(map[string]any)
+	}
+	if target.Meta == nil {
+		target.Meta = make(map[string]any)
+	}
+
+	// Determine which lists to update
+	var sourceKey, targetKey string
+	if relationType == backend.RelationBlocks {
+		sourceKey = "blocks"
+		targetKey = "blocked_by"
+	} else {
+		sourceKey = "blocked_by"
+		targetKey = "blocks"
+	}
+
+	// Remove from source's list
+	source.Meta[sourceKey] = removeString(metaStringSlice(source.Meta, sourceKey), targetID)
+	// Remove from target's list (inverse)
+	target.Meta[targetKey] = removeString(metaStringSlice(target.Meta, targetKey), sourceID)
+
+	now := time.Now().UTC()
+	source.Updated = now
+	target.Updated = now
+
+	if err := l.writeTask(source); err != nil {
+		return fmt.Errorf("failed to write source task: %w", err)
+	}
+	if err := l.writeTask(target); err != nil {
+		return fmt.Errorf("failed to write target task: %w", err)
+	}
+
+	// Git commit if enabled
+	if err := l.gitCommit("unlink", sourceID); err != nil {
+		return fmt.Errorf("failed to commit: %w", err)
+	}
+
+	return nil
+}
+
+// ListRelations returns all dependency relationships for a task.
+// Implements the backend.Relater interface.
+func (l *Local) ListRelations(id string) ([]backend.Relation, error) {
+	if !l.connected {
+		return nil, errors.New("not connected")
+	}
+
+	task, err := l.findTask(id)
+	if err != nil {
+		return nil, err
+	}
+
+	var relations []backend.Relation
+
+	// Process "blocks" list
+	for _, blockedID := range metaStringSlice(task.Meta, "blocks") {
+		related, err := l.findTask(blockedID)
+		if err != nil {
+			continue // Skip tasks that no longer exist
+		}
+		relations = append(relations, backend.Relation{
+			Type:       backend.RelationBlocks,
+			TaskID:     blockedID,
+			TaskTitle:  related.Title,
+			TaskStatus: related.Status,
+		})
+	}
+
+	// Process "blocked_by" list
+	for _, blockerID := range metaStringSlice(task.Meta, "blocked_by") {
+		related, err := l.findTask(blockerID)
+		if err != nil {
+			continue // Skip tasks that no longer exist
+		}
+		relations = append(relations, backend.Relation{
+			Type:       backend.RelationBlockedBy,
+			TaskID:     blockerID,
+			TaskTitle:  related.Title,
+			TaskStatus: related.Status,
+		})
+	}
+
+	return relations, nil
+}
+
+// metaStringSlice extracts a []string from a task's Meta map.
+func metaStringSlice(meta map[string]any, key string) []string {
+	if meta == nil {
+		return nil
+	}
+	if s, ok := meta[key].([]string); ok {
+		return s
+	}
+	return nil
+}
+
+// containsString checks if a slice contains a string.
+func containsString(slice []string, s string) bool {
+	for _, v := range slice {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+// removeString removes all occurrences of s from slice.
+func removeString(slice []string, s string) []string {
+	result := make([]string, 0, len(slice))
+	for _, v := range slice {
+		if v != s {
+			result = append(result, v)
+		}
+	}
+	return result
+}
+
 // findAgentLabels returns all labels that match the agent label pattern.
 func (l *Local) findAgentLabels(labels []string) []string {
 	var agentLabels []string

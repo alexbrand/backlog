@@ -76,6 +76,17 @@ backlog move 001 in-progress
 backlog move 001 done
 ```
 
+Link tasks with dependencies:
+
+```bash
+backlog link 001 --blocks 002            # 001 blocks 002
+backlog link 002 --blocked-by 001        # equivalent
+backlog add "New task" --blocked-by 001  # create with dependency
+backlog show 002                         # shows "Blocked by: 001"
+backlog next                             # skips blocked tasks
+backlog unlink 001 --blocks 002          # remove dependency
+```
+
 ### GitHub Backend
 
 Configure a GitHub workspace in `~/.config/backlog/config.yaml`:
@@ -135,6 +146,8 @@ export LINEAR_API_KEY=lin_api_xxxx
 | `backlog move <id> <status>` | Transition task to a new status |
 | `backlog delete <id>` | Remove a task permanently |
 | `backlog reorder <id>` | Change the position of a task in the list |
+| `backlog link <id>` | Create a dependency between two tasks |
+| `backlog unlink <id>` | Remove a dependency between two tasks |
 | `backlog comment <id> <message>` | Add a comment to a task |
 
 ### Agent Coordination

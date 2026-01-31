@@ -13,6 +13,43 @@ type JSONFormatter struct{}
 
 // FormatTask outputs a single task as JSON.
 func (f *JSONFormatter) FormatTask(w io.Writer, task *backend.Task) error {
+	// If relations are present in Meta, include blocks/blocked_by arrays at the top level
+	if task.Meta != nil {
+		if relations, ok := task.Meta["relations"].([]backend.Relation); ok && len(relations) > 0 {
+			var blocks, blockedBy []map[string]any
+			for _, r := range relations {
+				entry := map[string]any{
+					"id":     r.TaskID,
+					"title":  r.TaskTitle,
+					"status": r.TaskStatus,
+				}
+				if r.Type == backend.RelationBlocks {
+					blocks = append(blocks, entry)
+				} else if r.Type == backend.RelationBlockedBy {
+					blockedBy = append(blockedBy, entry)
+				}
+			}
+			result := map[string]any{
+				"id":          task.ID,
+				"title":       task.Title,
+				"description": task.Description,
+				"status":      task.Status,
+				"priority":    task.Priority,
+				"assignee":    task.Assignee,
+				"labels":      task.Labels,
+				"created":     task.Created,
+				"updated":     task.Updated,
+				"url":         task.URL,
+			}
+			if len(blocks) > 0 {
+				result["blocks"] = blocks
+			}
+			if len(blockedBy) > 0 {
+				result["blocked_by"] = blockedBy
+			}
+			return f.writeJSON(w, result)
+		}
+	}
 	return f.writeJSON(w, task)
 }
 
@@ -182,6 +219,26 @@ func (f *JSONFormatter) FormatReordered(w io.Writer, task *backend.Task) error {
 		"status":     task.Status,
 		"priority":   task.Priority,
 		"sort_order": task.SortOrder,
+	})
+}
+
+// FormatLinked outputs the result of linking two tasks as JSON.
+func (f *JSONFormatter) FormatLinked(w io.Writer, relation *backend.Relation, sourceID string) error {
+	return f.writeJSON(w, map[string]any{
+		"source_id":   sourceID,
+		"target_id":   relation.TaskID,
+		"type":        relation.Type,
+		"task_title":  relation.TaskTitle,
+		"task_status": relation.TaskStatus,
+	})
+}
+
+// FormatUnlinked outputs the result of unlinking two tasks as JSON.
+func (f *JSONFormatter) FormatUnlinked(w io.Writer, sourceID, targetID string) error {
+	return f.writeJSON(w, map[string]any{
+		"source_id": sourceID,
+		"target_id": targetID,
+		"unlinked":  true,
 	})
 }
 

@@ -323,3 +323,38 @@ type Reorderer interface {
 	// Returns the updated task with its new SortOrder.
 	Reorder(id string, position ReorderPosition) (*Task, error)
 }
+
+// RelationType represents the type of relationship between two tasks.
+type RelationType string
+
+const (
+	RelationBlocks    RelationType = "blocks"
+	RelationBlockedBy RelationType = "blocked-by"
+)
+
+// Relation represents a dependency relationship between two tasks.
+type Relation struct {
+	// Type is the relationship type (blocks or blocked-by).
+	Type RelationType `json:"type"`
+
+	// TaskID is the ID of the related task.
+	TaskID string `json:"task_id"`
+
+	// TaskTitle is the title of the related task.
+	TaskTitle string `json:"task_title"`
+
+	// TaskStatus is the current status of the related task.
+	TaskStatus Status `json:"task_status"`
+}
+
+// Relater is an optional interface for backends that support task dependencies.
+type Relater interface {
+	// Link creates a dependency relationship between two tasks.
+	Link(sourceID, targetID string, relationType RelationType) (*Relation, error)
+
+	// Unlink removes a dependency relationship between two tasks.
+	Unlink(sourceID, targetID string, relationType RelationType) error
+
+	// ListRelations returns all dependency relationships for a task.
+	ListRelations(id string) ([]Relation, error)
+}

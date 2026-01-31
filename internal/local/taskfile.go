@@ -21,6 +21,8 @@ type taskFrontmatter struct {
 	Priority  backend.Priority `yaml:"priority,omitempty"`
 	Assignee  string           `yaml:"assignee,omitempty"`
 	Labels    []string         `yaml:"labels,omitempty"`
+	Blocks    []string         `yaml:"blocks,omitempty"`
+	BlockedBy []string         `yaml:"blocked_by,omitempty"`
 	SortOrder float64          `yaml:"sort_order,omitempty"`
 	Created   time.Time        `yaml:"created"`
 	Updated   time.Time        `yaml:"updated"`
@@ -64,10 +66,20 @@ func (l *Local) readTaskFile(filePath string, status backend.Status) (*backend.T
 		task.Priority = backend.PriorityNone
 	}
 
-	// Parse comments if any
-	if len(comments) > 0 {
-		task.Meta = make(map[string]any)
-		task.Meta["comments"] = comments
+	// Initialize meta for comments and relations
+	if len(comments) > 0 || len(fm.Blocks) > 0 || len(fm.BlockedBy) > 0 {
+		if task.Meta == nil {
+			task.Meta = make(map[string]any)
+		}
+		if len(comments) > 0 {
+			task.Meta["comments"] = comments
+		}
+		if len(fm.Blocks) > 0 {
+			task.Meta["blocks"] = fm.Blocks
+		}
+		if len(fm.BlockedBy) > 0 {
+			task.Meta["blocked_by"] = fm.BlockedBy
+		}
 	}
 
 	return task, nil
@@ -85,6 +97,17 @@ func (l *Local) writeTask(task *backend.Task) error {
 	filename := generateFilename(task.ID, task.Title)
 	filePath := filepath.Join(statusDir, filename)
 
+	// Extract blocks/blocked_by from meta
+	var blocks, blockedBy []string
+	if task.Meta != nil {
+		if b, ok := task.Meta["blocks"].([]string); ok {
+			blocks = b
+		}
+		if b, ok := task.Meta["blocked_by"].([]string); ok {
+			blockedBy = b
+		}
+	}
+
 	// Build frontmatter
 	fm := taskFrontmatter{
 		ID:        task.ID,
@@ -92,6 +115,8 @@ func (l *Local) writeTask(task *backend.Task) error {
 		Priority:  task.Priority,
 		Assignee:  task.Assignee,
 		Labels:    task.Labels,
+		Blocks:    blocks,
+		BlockedBy: blockedBy,
 		SortOrder: task.SortOrder,
 		Created:   task.Created,
 		Updated:   task.Updated,

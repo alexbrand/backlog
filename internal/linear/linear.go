@@ -2226,6 +2226,366 @@ func linearPriorityOrder(p backend.Priority) int {
 	}
 }
 
+// Link creates a dependency relationship between two issues in Linear.
+// Implements the backend.Relater interface.
+func (l *Linear) Link(sourceID, targetID string, relationType backend.RelationType) (*backend.Relation, error) {
+	if !l.connected {
+		return nil, errors.New("not connected")
+	}
+
+	// Resolve both IDs to Linear UUIDs
+	sourceIssue, err := l.getIssueByIdentifier(l.normalizeID(sourceID))
+	if err != nil {
+		return nil, fmt.Errorf("source issue: %w", err)
+	}
+	sourceLinearID := getString(sourceIssue, "id")
+
+	targetIssue, err := l.getIssueByIdentifier(l.normalizeID(targetID))
+	if err != nil {
+		return nil, fmt.Errorf("target issue: %w", err)
+	}
+	targetLinearID := getString(targetIssue, "id")
+
+	// Map relation type to Linear's issueRelationCreate type
+	var linearType string
+	if relationType == backend.RelationBlocks {
+		linearType = "blocks"
+	} else {
+		linearType = "blocks"
+		// For blocked-by, swap source and target
+		sourceLinearID, targetLinearID = targetLinearID, sourceLinearID
+	}
+
+	mutation := `
+		mutation CreateRelation($input: IssueRelationCreateInput!) {
+			issueRelationCreate(input: $input) {
+				success
+				issueRelation {
+					id
+					type
+					relatedIssue {
+						identifier
+						title
+						state { name }
+					}
+				}
+			}
+		}
+	`
+
+	result, err := l.graphQL(mutation, map[string]any{
+		"input": map[string]any{
+			"issueId":        sourceLinearID,
+			"relatedIssueId": targetLinearID,
+			"type":           linearType,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create relation: %w", err)
+	}
+
+	data, ok := result["data"].(map[string]any)
+	if !ok {
+		return nil, errors.New("unexpected response format")
+	}
+
+	createResult, ok := data["issueRelationCreate"].(map[string]any)
+	if !ok {
+		return nil, errors.New("unexpected response format: missing issueRelationCreate")
+	}
+
+	success, _ := createResult["success"].(bool)
+	if !success {
+		return nil, errors.New("failed to create relation")
+	}
+
+	targetTask := l.issueToTask(targetIssue)
+	return &backend.Relation{
+		Type:       relationType,
+		TaskID:     targetTask.ID,
+		TaskTitle:  targetTask.Title,
+		TaskStatus: targetTask.Status,
+	}, nil
+}
+
+// Unlink removes a dependency relationship between two issues in Linear.
+// Implements the backend.Relater interface.
+func (l *Linear) Unlink(sourceID, targetID string, relationType backend.RelationType) error {
+	if !l.connected {
+		return errors.New("not connected")
+	}
+
+	sourceIssue, err := l.getIssueByIdentifier(l.normalizeID(sourceID))
+	if err != nil {
+		return fmt.Errorf("source issue: %w", err)
+	}
+	sourceLinearID := getString(sourceIssue, "id")
+
+	targetIssue, err := l.getIssueByIdentifier(l.normalizeID(targetID))
+	if err != nil {
+		return fmt.Errorf("target issue: %w", err)
+	}
+	targetLinearID := getString(targetIssue, "id")
+
+	// Find the relation ID by listing relations on the source issue
+	relationID, err := l.findRelationID(sourceLinearID, targetLinearID, relationType)
+	if err != nil {
+		return err
+	}
+
+	mutation := `
+		mutation DeleteRelation($id: String!) {
+			issueRelationDelete(id: $id) {
+				success
+			}
+		}
+	`
+
+	result, err := l.graphQL(mutation, map[string]any{"id": relationID})
+	if err != nil {
+		return fmt.Errorf("failed to delete relation: %w", err)
+	}
+
+	data, ok := result["data"].(map[string]any)
+	if !ok {
+		return errors.New("unexpected response format")
+	}
+
+	deleteResult, ok := data["issueRelationDelete"].(map[string]any)
+	if !ok {
+		return errors.New("unexpected response format: missing issueRelationDelete")
+	}
+
+	success, _ := deleteResult["success"].(bool)
+	if !success {
+		return errors.New("failed to delete relation")
+	}
+
+	return nil
+}
+
+// ListRelations returns all dependency relationships for an issue in Linear.
+// Implements the backend.Relater interface.
+func (l *Linear) ListRelations(id string) ([]backend.Relation, error) {
+	if !l.connected {
+		return nil, errors.New("not connected")
+	}
+
+	issueID := l.normalizeID(id)
+
+	query := `
+		query GetIssueRelations($id: String!) {
+			issue(id: $id) {
+				relations {
+					nodes {
+						id
+						type
+						relatedIssue {
+							identifier
+							title
+							state { name }
+						}
+					}
+				}
+				inverseRelations {
+					nodes {
+						id
+						type
+						issue {
+							identifier
+							title
+							state { name }
+						}
+					}
+				}
+			}
+		}
+	`
+
+	result, err := l.graphQL(query, map[string]any{"id": issueID})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list relations: %w", err)
+	}
+
+	data, ok := result["data"].(map[string]any)
+	if !ok {
+		return nil, errors.New("unexpected response format")
+	}
+
+	issue, ok := data["issue"].(map[string]any)
+	if !ok || issue == nil {
+		return nil, fmt.Errorf("issue %s not found", id)
+	}
+
+	var relations []backend.Relation
+
+	// Process forward relations (this issue -> related issue)
+	if relData, ok := issue["relations"].(map[string]any); ok {
+		if nodes, ok := relData["nodes"].([]any); ok {
+			for _, node := range nodes {
+				rel, ok := node.(map[string]any)
+				if !ok {
+					continue
+				}
+				relType := getString(rel, "type")
+				relatedIssue, _ := rel["relatedIssue"].(map[string]any)
+				if relatedIssue == nil {
+					continue
+				}
+
+				relation := backend.Relation{
+					TaskID:    getString(relatedIssue, "identifier"),
+					TaskTitle: getString(relatedIssue, "title"),
+				}
+
+				if state, ok := relatedIssue["state"].(map[string]any); ok {
+					stateName := getString(state, "name")
+					if status, ok := l.reverseStatusMap[strings.ToLower(stateName)]; ok {
+						relation.TaskStatus = status
+					}
+				}
+
+				if relType == "blocks" {
+					relation.Type = backend.RelationBlocks
+				} else {
+					continue // Skip non-dependency relations
+				}
+
+				relations = append(relations, relation)
+			}
+		}
+	}
+
+	// Process inverse relations (related issue -> this issue)
+	if invData, ok := issue["inverseRelations"].(map[string]any); ok {
+		if nodes, ok := invData["nodes"].([]any); ok {
+			for _, node := range nodes {
+				rel, ok := node.(map[string]any)
+				if !ok {
+					continue
+				}
+				relType := getString(rel, "type")
+				relatedIssue, _ := rel["issue"].(map[string]any)
+				if relatedIssue == nil {
+					continue
+				}
+
+				relation := backend.Relation{
+					TaskID:    getString(relatedIssue, "identifier"),
+					TaskTitle: getString(relatedIssue, "title"),
+				}
+
+				if state, ok := relatedIssue["state"].(map[string]any); ok {
+					stateName := getString(state, "name")
+					if status, ok := l.reverseStatusMap[strings.ToLower(stateName)]; ok {
+						relation.TaskStatus = status
+					}
+				}
+
+				if relType == "blocks" {
+					relation.Type = backend.RelationBlockedBy
+				} else {
+					continue // Skip non-dependency relations
+				}
+
+				relations = append(relations, relation)
+			}
+		}
+	}
+
+	return relations, nil
+}
+
+// findRelationID finds the Linear relation UUID for a given source/target/type.
+func (l *Linear) findRelationID(sourceLinearID, targetLinearID string, relationType backend.RelationType) (string, error) {
+	query := `
+		query GetIssueRelations($id: String!) {
+			issue(id: $id) {
+				relations {
+					nodes {
+						id
+						type
+						relatedIssue { id }
+					}
+				}
+				inverseRelations {
+					nodes {
+						id
+						type
+						issue { id }
+					}
+				}
+			}
+		}
+	`
+
+	// For "blocks", the relation is on the source issue pointing to the target
+	// For "blocked-by", the relation is on the target issue pointing to the source (as "blocks")
+	var queryID, matchID string
+	if relationType == backend.RelationBlocks {
+		queryID = sourceLinearID
+		matchID = targetLinearID
+	} else {
+		queryID = targetLinearID
+		matchID = sourceLinearID
+	}
+
+	result, err := l.graphQL(query, map[string]any{"id": queryID})
+	if err != nil {
+		return "", err
+	}
+
+	data, ok := result["data"].(map[string]any)
+	if !ok {
+		return "", errors.New("unexpected response format")
+	}
+
+	issue, ok := data["issue"].(map[string]any)
+	if !ok || issue == nil {
+		return "", errors.New("issue not found")
+	}
+
+	// Search forward relations
+	if relData, ok := issue["relations"].(map[string]any); ok {
+		if nodes, ok := relData["nodes"].([]any); ok {
+			for _, node := range nodes {
+				rel, ok := node.(map[string]any)
+				if !ok {
+					continue
+				}
+				if getString(rel, "type") == "blocks" {
+					if related, ok := rel["relatedIssue"].(map[string]any); ok {
+						if getString(related, "id") == matchID {
+							return getString(rel, "id"), nil
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Search inverse relations
+	if invData, ok := issue["inverseRelations"].(map[string]any); ok {
+		if nodes, ok := invData["nodes"].([]any); ok {
+			for _, node := range nodes {
+				rel, ok := node.(map[string]any)
+				if !ok {
+					continue
+				}
+				if getString(rel, "type") == "blocks" {
+					if related, ok := rel["issue"].(map[string]any); ok {
+						if getString(related, "id") == matchID {
+							return getString(rel, "id"), nil
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return "", fmt.Errorf("relation not found between issues")
+}
+
 // ClaimConflictError represents an error when a task is already claimed by another agent.
 type ClaimConflictError struct {
 	TaskID       string

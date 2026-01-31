@@ -826,3 +826,75 @@ func containsHelper(s, substr string) bool {
 	}
 	return false
 }
+
+func TestTaskFile_BlocksBlockedBy(t *testing.T) {
+	l, backlogDir := setupBacklog(t)
+
+	// Create a task with blocks/blocked_by in meta
+	task := &backend.Task{
+		ID:       "001",
+		Title:    "Task with deps",
+		Status:   backend.StatusTodo,
+		Priority: backend.PriorityHigh,
+		Created:  time.Now().UTC(),
+		Updated:  time.Now().UTC(),
+		Meta: map[string]any{
+			"blocks":     []string{"002", "003"},
+			"blocked_by": []string{"004"},
+		},
+	}
+
+	// Write the task
+	if err := l.writeTask(task); err != nil {
+		t.Fatalf("writeTask() error = %v", err)
+	}
+
+	// Read it back
+	filePath := filepath.Join(backlogDir, "todo", "001-task-with-deps.md")
+	readTask, err := l.readTaskFile(filePath, backend.StatusTodo)
+	if err != nil {
+		t.Fatalf("readTaskFile() error = %v", err)
+	}
+
+	// Verify blocks
+	blocks, ok := readTask.Meta["blocks"].([]string)
+	if !ok {
+		// YAML unmarshals as []any, check for that
+		if blocksAny, ok := readTask.Meta["blocks"].([]any); ok {
+			blocks = make([]string, len(blocksAny))
+			for i, v := range blocksAny {
+				blocks[i] = v.(string)
+			}
+		}
+	}
+	if len(blocks) != 2 || blocks[0] != "002" || blocks[1] != "003" {
+		t.Errorf("blocks = %v, want [002 003]", blocks)
+	}
+
+	// Verify blocked_by
+	blockedBy, ok := readTask.Meta["blocked_by"].([]string)
+	if !ok {
+		if blockedByAny, ok := readTask.Meta["blocked_by"].([]any); ok {
+			blockedBy = make([]string, len(blockedByAny))
+			for i, v := range blockedByAny {
+				blockedBy[i] = v.(string)
+			}
+		}
+	}
+	if len(blockedBy) != 1 || blockedBy[0] != "004" {
+		t.Errorf("blocked_by = %v, want [004]", blockedBy)
+	}
+
+	// Verify frontmatter contains the fields
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	contentStr := string(content)
+	if !contains(contentStr, "blocks:") {
+		t.Error("frontmatter should contain 'blocks:'")
+	}
+	if !contains(contentStr, "blocked_by:") {
+		t.Error("frontmatter should contain 'blocked_by:'")
+	}
+}

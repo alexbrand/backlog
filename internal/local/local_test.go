@@ -547,3 +547,249 @@ func TestReadWriteRoundtrip(t *testing.T) {
 		t.Errorf("Assignee = %q, want %q", task.Assignee, original.Assignee)
 	}
 }
+
+func TestLink(t *testing.T) {
+	l, _ := setupBacklog(t)
+
+	// Create two tasks
+	task1, err := l.Create(backend.TaskInput{Title: "Task A"})
+	if err != nil {
+		t.Fatalf("Create task1 error = %v", err)
+	}
+	task2, err := l.Create(backend.TaskInput{Title: "Task B"})
+	if err != nil {
+		t.Fatalf("Create task2 error = %v", err)
+	}
+
+	// Link task1 blocks task2
+	relation, err := l.Link(task1.ID, task2.ID, backend.RelationBlocks)
+	if err != nil {
+		t.Fatalf("Link() error = %v", err)
+	}
+
+	if relation.Type != backend.RelationBlocks {
+		t.Errorf("relation.Type = %q, want %q", relation.Type, backend.RelationBlocks)
+	}
+	if relation.TaskID != task2.ID {
+		t.Errorf("relation.TaskID = %q, want %q", relation.TaskID, task2.ID)
+	}
+	if relation.TaskTitle != "Task B" {
+		t.Errorf("relation.TaskTitle = %q, want %q", relation.TaskTitle, "Task B")
+	}
+
+	// Verify source has "blocks" in meta
+	source, err := l.Get(task1.ID)
+	if err != nil {
+		t.Fatalf("Get task1 error = %v", err)
+	}
+	blocks := metaStringSlice(source.Meta, "blocks")
+	if len(blocks) != 1 || blocks[0] != task2.ID {
+		t.Errorf("source blocks = %v, want [%s]", blocks, task2.ID)
+	}
+
+	// Verify target has "blocked_by" in meta
+	target, err := l.Get(task2.ID)
+	if err != nil {
+		t.Fatalf("Get task2 error = %v", err)
+	}
+	blockedBy := metaStringSlice(target.Meta, "blocked_by")
+	if len(blockedBy) != 1 || blockedBy[0] != task1.ID {
+		t.Errorf("target blocked_by = %v, want [%s]", blockedBy, task1.ID)
+	}
+}
+
+func TestLinkBlockedBy(t *testing.T) {
+	l, _ := setupBacklog(t)
+
+	task1, err := l.Create(backend.TaskInput{Title: "Task A"})
+	if err != nil {
+		t.Fatalf("Create task1 error = %v", err)
+	}
+	task2, err := l.Create(backend.TaskInput{Title: "Task B"})
+	if err != nil {
+		t.Fatalf("Create task2 error = %v", err)
+	}
+
+	// Link task2 blocked-by task1
+	relation, err := l.Link(task2.ID, task1.ID, backend.RelationBlockedBy)
+	if err != nil {
+		t.Fatalf("Link() error = %v", err)
+	}
+
+	if relation.Type != backend.RelationBlockedBy {
+		t.Errorf("relation.Type = %q, want %q", relation.Type, backend.RelationBlockedBy)
+	}
+
+	// Verify task2 has "blocked_by" containing task1
+	target, err := l.Get(task2.ID)
+	if err != nil {
+		t.Fatalf("Get task2 error = %v", err)
+	}
+	blockedBy := metaStringSlice(target.Meta, "blocked_by")
+	if len(blockedBy) != 1 || blockedBy[0] != task1.ID {
+		t.Errorf("task2 blocked_by = %v, want [%s]", blockedBy, task1.ID)
+	}
+
+	// Verify task1 has "blocks" containing task2
+	source, err := l.Get(task1.ID)
+	if err != nil {
+		t.Fatalf("Get task1 error = %v", err)
+	}
+	blocks := metaStringSlice(source.Meta, "blocks")
+	if len(blocks) != 1 || blocks[0] != task2.ID {
+		t.Errorf("task1 blocks = %v, want [%s]", blocks, task2.ID)
+	}
+}
+
+func TestUnlink(t *testing.T) {
+	l, _ := setupBacklog(t)
+
+	task1, err := l.Create(backend.TaskInput{Title: "Task A"})
+	if err != nil {
+		t.Fatalf("Create task1 error = %v", err)
+	}
+	task2, err := l.Create(backend.TaskInput{Title: "Task B"})
+	if err != nil {
+		t.Fatalf("Create task2 error = %v", err)
+	}
+
+	// Link then unlink
+	_, err = l.Link(task1.ID, task2.ID, backend.RelationBlocks)
+	if err != nil {
+		t.Fatalf("Link() error = %v", err)
+	}
+
+	err = l.Unlink(task1.ID, task2.ID, backend.RelationBlocks)
+	if err != nil {
+		t.Fatalf("Unlink() error = %v", err)
+	}
+
+	// Verify blocks removed from source
+	source, err := l.Get(task1.ID)
+	if err != nil {
+		t.Fatalf("Get task1 error = %v", err)
+	}
+	blocks := metaStringSlice(source.Meta, "blocks")
+	if len(blocks) != 0 {
+		t.Errorf("source blocks = %v, want empty", blocks)
+	}
+
+	// Verify blocked_by removed from target
+	target, err := l.Get(task2.ID)
+	if err != nil {
+		t.Fatalf("Get task2 error = %v", err)
+	}
+	blockedBy := metaStringSlice(target.Meta, "blocked_by")
+	if len(blockedBy) != 0 {
+		t.Errorf("target blocked_by = %v, want empty", blockedBy)
+	}
+}
+
+func TestListRelations(t *testing.T) {
+	l, _ := setupBacklog(t)
+
+	task1, err := l.Create(backend.TaskInput{Title: "Task A"})
+	if err != nil {
+		t.Fatalf("Create task1 error = %v", err)
+	}
+	task2, err := l.Create(backend.TaskInput{Title: "Task B"})
+	if err != nil {
+		t.Fatalf("Create task2 error = %v", err)
+	}
+	task3, err := l.Create(backend.TaskInput{Title: "Task C"})
+	if err != nil {
+		t.Fatalf("Create task3 error = %v", err)
+	}
+
+	// task1 blocks task2 and task3
+	_, err = l.Link(task1.ID, task2.ID, backend.RelationBlocks)
+	if err != nil {
+		t.Fatalf("Link 1->2 error = %v", err)
+	}
+	_, err = l.Link(task1.ID, task3.ID, backend.RelationBlocks)
+	if err != nil {
+		t.Fatalf("Link 1->3 error = %v", err)
+	}
+
+	// List relations for task1
+	relations, err := l.ListRelations(task1.ID)
+	if err != nil {
+		t.Fatalf("ListRelations() error = %v", err)
+	}
+
+	if len(relations) != 2 {
+		t.Fatalf("len(relations) = %d, want 2", len(relations))
+	}
+
+	// Both should be "blocks" type
+	for _, r := range relations {
+		if r.Type != backend.RelationBlocks {
+			t.Errorf("relation.Type = %q, want %q", r.Type, backend.RelationBlocks)
+		}
+	}
+
+	// List relations for task2 (should have 1 blocked-by)
+	relations, err = l.ListRelations(task2.ID)
+	if err != nil {
+		t.Fatalf("ListRelations(task2) error = %v", err)
+	}
+
+	if len(relations) != 1 {
+		t.Fatalf("len(relations) = %d, want 1", len(relations))
+	}
+	if relations[0].Type != backend.RelationBlockedBy {
+		t.Errorf("relation.Type = %q, want %q", relations[0].Type, backend.RelationBlockedBy)
+	}
+	if relations[0].TaskID != task1.ID {
+		t.Errorf("relation.TaskID = %q, want %q", relations[0].TaskID, task1.ID)
+	}
+}
+
+func TestLinkIdempotent(t *testing.T) {
+	l, _ := setupBacklog(t)
+
+	task1, err := l.Create(backend.TaskInput{Title: "Task A"})
+	if err != nil {
+		t.Fatalf("Create task1 error = %v", err)
+	}
+	task2, err := l.Create(backend.TaskInput{Title: "Task B"})
+	if err != nil {
+		t.Fatalf("Create task2 error = %v", err)
+	}
+
+	// Link twice
+	_, err = l.Link(task1.ID, task2.ID, backend.RelationBlocks)
+	if err != nil {
+		t.Fatalf("Link() first error = %v", err)
+	}
+	_, err = l.Link(task1.ID, task2.ID, backend.RelationBlocks)
+	if err != nil {
+		t.Fatalf("Link() second error = %v", err)
+	}
+
+	// Should still only have one entry
+	source, _ := l.Get(task1.ID)
+	blocks := metaStringSlice(source.Meta, "blocks")
+	if len(blocks) != 1 {
+		t.Errorf("blocks after double-link = %v, want exactly 1 entry", blocks)
+	}
+}
+
+func TestLinkNonExistentTask(t *testing.T) {
+	l, _ := setupBacklog(t)
+
+	task1, err := l.Create(backend.TaskInput{Title: "Task A"})
+	if err != nil {
+		t.Fatalf("Create task1 error = %v", err)
+	}
+
+	_, err = l.Link(task1.ID, "nonexistent", backend.RelationBlocks)
+	if err == nil {
+		t.Fatal("Link() with non-existent target should return error")
+	}
+
+	_, err = l.Link("nonexistent", task1.ID, backend.RelationBlocks)
+	if err == nil {
+		t.Fatal("Link() with non-existent source should return error")
+	}
+}

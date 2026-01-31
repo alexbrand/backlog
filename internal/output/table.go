@@ -41,6 +41,34 @@ func (f *TableFormatter) FormatTask(w io.Writer, task *backend.Task) error {
 		fmt.Fprintf(w, "URL:       %s\n", task.URL)
 	}
 
+	// Relations
+	if task.Meta != nil {
+		if relations, ok := task.Meta["relations"].([]backend.Relation); ok {
+			var blocks, blockedBy []backend.Relation
+			for _, r := range relations {
+				if r.Type == backend.RelationBlocks {
+					blocks = append(blocks, r)
+				} else if r.Type == backend.RelationBlockedBy {
+					blockedBy = append(blockedBy, r)
+				}
+			}
+			if len(blocks) > 0 {
+				ids := make([]string, len(blocks))
+				for i, r := range blocks {
+					ids[i] = r.TaskID
+				}
+				fmt.Fprintf(w, "Blocks:    %s\n", strings.Join(ids, ", "))
+			}
+			if len(blockedBy) > 0 {
+				ids := make([]string, len(blockedBy))
+				for i, r := range blockedBy {
+					ids[i] = r.TaskID
+				}
+				fmt.Fprintf(w, "Blocked by: %s\n", strings.Join(ids, ", "))
+			}
+		}
+	}
+
 	// Description
 	if task.Description != "" {
 		fmt.Fprintln(w)
@@ -228,5 +256,17 @@ func (f *TableFormatter) FormatDeleted(w io.Writer, id string) error {
 // FormatReordered outputs the result of reordering a task.
 func (f *TableFormatter) FormatReordered(w io.Writer, task *backend.Task) error {
 	fmt.Fprintf(w, "Reordered %s: %s\n", task.ID, task.Title)
+	return nil
+}
+
+// FormatLinked outputs the result of linking two tasks.
+func (f *TableFormatter) FormatLinked(w io.Writer, relation *backend.Relation, sourceID string) error {
+	fmt.Fprintf(w, "Linked %s %s %s\n", sourceID, relation.Type, relation.TaskID)
+	return nil
+}
+
+// FormatUnlinked outputs the result of unlinking two tasks.
+func (f *TableFormatter) FormatUnlinked(w io.Writer, sourceID, targetID string) error {
+	fmt.Fprintf(w, "Unlinked %s from %s\n", sourceID, targetID)
 	return nil
 }

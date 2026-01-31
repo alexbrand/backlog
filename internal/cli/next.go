@@ -84,8 +84,12 @@ func runNext() error {
 		return nil
 	}
 
-	// Find the highest priority task
-	nextTask := findHighestPriorityTask(taskList.Tasks)
+	// Find the highest priority unblocked task
+	var relater backend.Relater
+	if r, ok := b.(backend.Relater); ok {
+		relater = r
+	}
+	nextTask := findHighestPriorityUnblockedTask(taskList.Tasks, relater)
 	if nextTask == nil {
 		return nil
 	}
@@ -146,4 +150,44 @@ func findHighestPriorityTask(tasks []backend.Task) *backend.Task {
 	}
 
 	return highest
+}
+
+// findHighestPriorityUnblockedTask returns the highest priority task that has no
+// unresolved blockers. If relater is nil, falls back to findHighestPriorityTask.
+// Uses lazy evaluation to avoid unnecessary API calls.
+func findHighestPriorityUnblockedTask(tasks []backend.Task, relater backend.Relater) *backend.Task {
+	if relater == nil {
+		return findHighestPriorityTask(tasks)
+	}
+
+	if len(tasks) == 0 {
+		return nil
+	}
+
+	// Sort by priority first (tasks from List are already sorted, but be safe)
+	sorted := make([]backend.Task, len(tasks))
+	copy(sorted, tasks)
+
+	// Iterate in priority order, checking blockers lazily
+	for i := range sorted {
+		relations, err := relater.ListRelations(sorted[i].ID)
+		if err != nil {
+			// If we can't check relations, treat as unblocked
+			return &sorted[i]
+		}
+
+		blocked := false
+		for _, r := range relations {
+			if r.Type == backend.RelationBlockedBy && r.TaskStatus != backend.StatusDone {
+				blocked = true
+				break
+			}
+		}
+
+		if !blocked {
+			return &sorted[i]
+		}
+	}
+
+	return nil
 }

@@ -152,3 +152,15 @@ func (f *PlainFormatter) FormatReordered(w io.Writer, task *backend.Task) error 
 	fmt.Fprintln(w, task.ID)
 	return nil
 }
+
+// FormatLinked outputs the result of linking two tasks in plain format.
+func (f *PlainFormatter) FormatLinked(w io.Writer, relation *backend.Relation, sourceID string) error {
+	fmt.Fprintf(w, "%s\t%s\t%s\n", sourceID, relation.Type, relation.TaskID)
+	return nil
+}
+
+// FormatUnlinked outputs the result of unlinking two tasks in plain format.
+func (f *PlainFormatter) FormatUnlinked(w io.Writer, sourceID, targetID string) error {
+	fmt.Fprintf(w, "%s\t%s\n", sourceID, targetID)
+	return nil
+}

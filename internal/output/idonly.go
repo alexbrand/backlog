@@ -111,3 +111,15 @@ func (f *IDOnlyFormatter) FormatReordered(w io.Writer, task *backend.Task) error
 	fmt.Fprintln(w, task.ID)
 	return nil
 }
+
+// FormatLinked outputs only the source task ID.
+func (f *IDOnlyFormatter) FormatLinked(w io.Writer, relation *backend.Relation, sourceID string) error {
+	fmt.Fprintln(w, sourceID)
+	return nil
+}
+
+// FormatUnlinked outputs only the source task ID.
+func (f *IDOnlyFormatter) FormatUnlinked(w io.Writer, sourceID, targetID string) error {
+	fmt.Fprintln(w, sourceID)
+	return nil
+}

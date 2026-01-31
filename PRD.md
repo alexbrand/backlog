@@ -373,6 +373,41 @@ GH-124
 
 ---
 
+#### `backlog link <source-id>`
+
+Create a dependency relationship between two tasks.
+
+```bash
+backlog link 001 --blocks 002         # 001 blocks 002
+backlog link 002 --blocked-by 001     # 002 is blocked by 001
+```
+
+Exactly one of `--blocks` or `--blocked-by` must be specified.
+
+Both sides of the relationship are persisted: linking `001 --blocks 002` also records `002` as blocked by `001`.
+
+**Behavior:**
+- `backlog next` skips tasks that have unresolved blockers (any `blocked-by` relation where the blocking task's status is not `done`)
+- `backlog show` displays `Blocks:` and `Blocked by:` lines when relations exist
+- `backlog add` and `backlog edit` accept `--blocks` and `--blocked-by` flags to set dependencies at creation/edit time
+
+**Exit codes:** 1 = missing/invalid flags or task not found
+
+---
+
+#### `backlog unlink <source-id>`
+
+Remove a dependency relationship between two tasks.
+
+```bash
+backlog unlink 001 --blocks 002
+backlog unlink 002 --blocked-by 001
+```
+
+Same flag requirements as `link`.
+
+---
+
 #### `backlog sync`
 
 Sync local cache with remote (for backends that support offline).

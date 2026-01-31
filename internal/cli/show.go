@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/alexbrand/backlog/internal/backend"
 	"github.com/alexbrand/backlog/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -53,6 +54,17 @@ func runShow(id string) error {
 			return NotFoundError(err.Error())
 		}
 		return err
+	}
+
+	// Load relations if backend supports them
+	if relater, ok := b.(backend.Relater); ok {
+		relations, relErr := relater.ListRelations(id)
+		if relErr == nil && len(relations) > 0 {
+			if task.Meta == nil {
+				task.Meta = make(map[string]any)
+			}
+			task.Meta["relations"] = relations
+		}
 	}
 
 	// Output the task (with comments if requested)
