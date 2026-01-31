@@ -6,7 +6,7 @@ Feature: Initialization
   Scenario: Initialize backlog with local backend
     When I run "backlog init" with input:
       """
-      2
+      3
       1
 
       """
@@ -42,7 +42,7 @@ Feature: Initialization
     And a file "src/main.go" with content "package main"
     When I run "backlog init" with input:
       """
-      2
+      3
       1
 
       """
@@ -55,7 +55,7 @@ Feature: Initialization
     Given a fresh backlog directory
     When I run "backlog init" with input:
       """
-      2
+      3
       1
 
       """
@@ -65,7 +65,7 @@ Feature: Initialization
   Scenario: Initialize creates all status directories
     When I run "backlog init" with input:
       """
-      2
+      3
       1
 
       """
@@ -79,7 +79,7 @@ Feature: Initialization
   Scenario: Initialize with git-based locking
     When I run "backlog init" with input:
       """
-      2
+      3
       2
 
       """
@@ -89,7 +89,7 @@ Feature: Initialization
   Scenario: Initialize with agent ID
     When I run "backlog init" with input:
       """
-      2
+      3
       1
       my-agent
       """

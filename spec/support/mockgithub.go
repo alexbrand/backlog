@@ -968,15 +968,16 @@ func (m *MockGitHubServer) handleProjectQuery(w http.ResponseWriter, query strin
 	isNodeQuery := strings.Contains(query, "node(")
 
 	// Build response based on query type
-	if strings.Contains(query, "field") || strings.Contains(query, "Field") {
-		// Query for project fields (columns)
-		m.handleProjectFieldsQuery(w, project)
-		return
-	}
-
+	// Check for "items" before "field" because items queries also contain "fieldValues"
 	if strings.Contains(query, "items") {
 		// Query for project items
 		m.handleProjectItemsQuery(w, projectNumber, project, isNodeQuery)
+		return
+	}
+
+	if strings.Contains(query, "field") || strings.Contains(query, "Field") {
+		// Query for project fields (columns)
+		m.handleProjectFieldsQuery(w, project)
 		return
 	}
 
@@ -1104,14 +1105,13 @@ func (m *MockGitHubServer) handleProjectItemsQuery(w http.ResponseWriter, projec
 			}
 
 			// Build field values in the format expected by GetProjectItemByIssue query
-			// The shurcooL graphql library handles inline fragments by checking field
-			// presence, not __typename, so we include all expected fields
+			// The shurcooL graphql library uses __typename to match inline fragments
 			fieldValues := []map[string]interface{}{
 				{
-					// These fields match ProjectV2ItemFieldSingleSelectValue inline fragment
+					"__typename": "ProjectV2ItemFieldSingleSelectValue",
 					"field": map[string]interface{}{
-						// This field matches ProjectV2SingleSelectField inline fragment
-						"id": "PVTSSF_Status",
+						"__typename": "ProjectV2SingleSelectField",
+						"id":         "PVTSSF_Status",
 					},
 					"optionId": item.ColumnID,
 					"name":     columnName,
@@ -1308,9 +1308,16 @@ func (m *MockGitHubServer) handleListProjectsQuery(w http.ResponseWriter, variab
 		return
 	}
 
-	// Build list of projects
+	// Build list of projects sorted by ID for deterministic ordering
+	var projectIDs []int
+	for id := range m.Projects {
+		projectIDs = append(projectIDs, id)
+	}
+	sort.Ints(projectIDs)
+
 	nodes := make([]map[string]interface{}, 0, len(m.Projects))
-	for _, project := range m.Projects {
+	for _, id := range projectIDs {
+		project := m.Projects[id]
 		nodes = append(nodes, map[string]interface{}{
 			"id":     fmt.Sprintf("PVT_%d", project.ID),
 			"number": project.ID,
